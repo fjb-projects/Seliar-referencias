@@ -1,0 +1,6 @@
+{
+  "sources": [
+    { "id": "fonavis", "file": "../Fonavis 1 .xlsx" },
+    { "id": "torres", "file": "../Torres similares.xlsx" }
+  ]
+}

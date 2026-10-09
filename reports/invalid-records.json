@@ -1,0 +1,928 @@
+{
+  "generatedAt": "2026-10-09T09:47:54.292Z",
+  "fuentes": [
+    {
+      "id": "fonavis",
+      "archivo": "Fonavis 1 .xlsx"
+    },
+    {
+      "id": "torres",
+      "archivo": "Torres similares.xlsx"
+    }
+  ],
+  "descartados": [
+    {
+      "fuente": "fonavis",
+      "sheet": "Centenario",
+      "barrio": "Fonavi Centenario",
+      "tipo": "manzana",
+      "nombre": "Manzana 7",
+      "detalles": {
+        "Limite Este": "Carlos De La Peña",
+        "Limite Oeste": "10 de junio"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Centenario",
+        "cell": "H3",
+        "row": 3
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Centenario casas",
+      "barrio": "CENTENARIO CASAS",
+      "tipo": "calle",
+      "nombre": "Sobre Independencia 3000",
+      "direccion": "Independencia 3000",
+      "detalles": {
+        "sentido": "Calles de Este a Oeste",
+        "En Google Maps figura como": "-31.668716, -60.722613"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Centenario casas",
+        "cell": "G5",
+        "row": 5
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Centenario casas",
+      "barrio": "CENTENARIO CASAS",
+      "tipo": "calle",
+      "nombre": "Sobre Malvinas 3000",
+      "direccion": "Malvinas 3000",
+      "detalles": {
+        "sentido": "Calles de Este a Oeste",
+        "En Google Maps figura como": "-31.669327, -60.724128"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Centenario casas",
+        "cell": "G6",
+        "row": 6
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Centenario casas",
+      "barrio": "CENTENARIO CASAS",
+      "tipo": "calle",
+      "nombre": "Sobre Padre Espinoza 400",
+      "direccion": "Padre Espinoza 400",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte",
+        "En Google Maps figura como": "-31.669226, -60.723241"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Centenario casas",
+        "cell": "K5",
+        "row": 5
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Centenario casas",
+      "barrio": "CENTENARIO CASAS",
+      "tipo": "calle",
+      "nombre": "Sobre Padre Espinoza 500",
+      "direccion": "Padre Espinoza 500",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte",
+        "En Google Maps figura como": "-31.668778, -60.722117"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Centenario casas",
+        "cell": "K6",
+        "row": 6
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Centenario casas",
+      "barrio": "CENTENARIO CASAS",
+      "tipo": "calle",
+      "nombre": "Sobre N Oroño 400",
+      "direccion": "N Oroño 400",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte",
+        "En Google Maps figura como": "-31.668939, -60.724049"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Centenario casas",
+        "cell": "K7",
+        "row": 7
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "El Pozo",
+      "barrio": "BARRIO EL POZO",
+      "tipo": "manzana",
+      "nombre": "Manzana 3",
+      "detalles": {
+        "Ubicacion por coordinadas": "José Babini 1159",
+        "Limite Norte": "Jose Babini",
+        "Limite Este": "Estevez Boero",
+        "Limite Sur": "Pablo Vrillaud",
+        "Limite Oeste": "Vera peñaloza"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "El Pozo",
+        "cell": "D4",
+        "row": 4
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "José Babini 1159"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "El Pozo",
+      "barrio": "BARRIO EL POZO",
+      "tipo": "torre",
+      "nombre": "Torre 2",
+      "direccion": "Caballero Martin",
+      "detalles": {
+        "Ubicacion por coordinadas": "Torre 2 Barrio El Pozo",
+        "Torre sobre": "Caballero Martin",
+        "Trayecto desde el ingreso": "L Maradona / Rector Martinez / Caballero Martin al sur ( Ingreso este)"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "El Pozo",
+        "cell": "C14",
+        "row": 14
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Torre 2 Barrio El Pozo"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "El Pozo",
+      "barrio": "BARRIO EL POZO",
+      "tipo": "torre",
+      "nombre": "Torre 11",
+      "direccion": "Julio Busaniche",
+      "detalles": {
+        "Ubicacion por coordinadas": "Julio Antonio Busaniche 4078",
+        "Torre sobre": "Julio Busaniche",
+        "Trayecto desde el ingreso": "Jimenez de Azua / Rector Martinez / Julio Busaniche al Norte"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "El Pozo",
+        "cell": "L14",
+        "row": 14
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Julio Antonio Busaniche 4078"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Eva Peron",
+      "barrio": "Eva Peron",
+      "tipo": "barrio",
+      "nombre": "Eva Peron",
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Eva Peron",
+        "cell": "B4",
+        "row": 4
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Eva Peron",
+      "barrio": "Eva Peron",
+      "tipo": "calle",
+      "nombre": "Patricias Argentinas 9800",
+      "direccion": "Patricias Argentinas 9800",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Eva Peron",
+        "cell": "K5",
+        "row": 5
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Eva Peron",
+      "barrio": "Eva Peron",
+      "tipo": "calle",
+      "nombre": "Patricias Argentinas 9900",
+      "direccion": "Patricias Argentinas 9900",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Eva Peron",
+        "cell": "K6",
+        "row": 6
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Eva Peron",
+      "barrio": "Eva Peron",
+      "tipo": "calle",
+      "nombre": "Patricias Argentinas 10000",
+      "direccion": "Patricias Argentinas 10000",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Eva Peron",
+        "cell": "K7",
+        "row": 7
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Eva Peron",
+      "barrio": "Eva Peron",
+      "tipo": "calle",
+      "nombre": "Solano Lima 9800",
+      "direccion": "Solano Lima 9800",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Eva Peron",
+        "cell": "K8",
+        "row": 8
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Eva Peron",
+      "barrio": "Eva Peron",
+      "tipo": "calle",
+      "nombre": "Solano Lima 9900",
+      "direccion": "Solano Lima 9900",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Eva Peron",
+        "cell": "K9",
+        "row": 9
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Eva Peron",
+      "barrio": "Eva Peron",
+      "tipo": "calle",
+      "nombre": "Solano Lima 10000",
+      "direccion": "Solano Lima 10000",
+      "detalles": {
+        "sentido": "Calles de Sur a Norte"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Eva Peron",
+        "cell": "K10",
+        "row": 10
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Las Flores II",
+      "barrio": "LAS FLORES II",
+      "tipo": "referencia",
+      "nombre": "Super Kilgelman",
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Las Flores II",
+        "cell": "B25",
+        "row": 25
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Av. Ángel V. Peñaloza 7561"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Las Flores II",
+      "barrio": "LAS FLORES II",
+      "tipo": "referencia",
+      "nombre": "Centro de Salud",
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Las Flores II",
+        "cell": "B27",
+        "row": 27
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Centro Salud Las Flores II"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Las Flores II",
+      "barrio": "LAS FLORES II",
+      "tipo": "referencia",
+      "nombre": "Jardin Las  Flores",
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Las Flores II",
+        "cell": "B33",
+        "row": 33
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Europa 7565"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Las Flores II",
+      "barrio": "LAS FLORES II",
+      "tipo": "torre",
+      "nombre": "TORRE 10",
+      "direccion": "12 de Infanteria 4100",
+      "detalles": {
+        "Ubicacion": "La Casa del Sabor",
+        "Direccion": "12 de Infanteria 4100"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Las Flores II",
+        "cell": "K4",
+        "row": 4
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "La Casa del Sabor"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Las Flores II",
+      "barrio": "LAS FLORES II",
+      "tipo": "monoblock",
+      "nombre": "MONOBLOCK 5",
+      "direccion": "12 de Infanteria 4500 / Calles de Este a Oeste / Sobre Calle / Millan Medina 4100 / Millan Medina 4200/4300 / Carlos Gardel 4100 / Carlos Gardel 4200 /4300 / Ayacucho 4100",
+      "detalles": {
+        "Ubicacion": "Regimiento 12 de Infantería 4563",
+        "Direccion": "12 de Infanteria 4500 / Calles de Este a Oeste / Sobre Calle / Millan Medina 4100 / Millan Medina 4200/4300 / Carlos Gardel 4100 / Carlos Gardel 4200 /4300 / Ayacucho 4100"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Las Flores II",
+        "cell": "F9",
+        "row": 9
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Regimiento 12 de Infantería 4563"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Las Flores II",
+      "barrio": "LAS FLORES II",
+      "tipo": "monoblock",
+      "nombre": "MONOBLOCK 10",
+      "direccion": "Europa 7500",
+      "detalles": {
+        "Ubicacion": "Estrada 7550",
+        "Direccion": "Europa 7500"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Las Flores II",
+        "cell": "K9",
+        "row": 9
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Estrada 7550"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Las Flores II",
+      "barrio": "LAS FLORES II",
+      "tipo": "monoblock",
+      "nombre": "MONOBLOCK 19",
+      "direccion": "Calle Publica 4100",
+      "detalles": {
+        "Ubicacion": "Ayacucho 4028",
+        "Direccion": "Calle Publica 4100"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Las Flores II",
+        "cell": "T9",
+        "row": 9
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Ayacucho 4028"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "La florida",
+      "barrio": "BARRIO LA FLORIDA",
+      "tipo": "torre",
+      "nombre": "Torre 2",
+      "direccion": "Mendoza 3981",
+      "detalles": {
+        "Ubicacion por coordinadas": "Mendoza 3949",
+        "Torre sobre": "Mendoza 3981",
+        "Otros": "De Oeste a este 2daa Torre"
+      },
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "La florida",
+        "cell": "C5",
+        "row": 5
+      },
+      "reason": "coordenada_no_numerica",
+      "explanation": "El campo de coordenadas contiene texto (dirección o nombre) en lugar de latitud/longitud. No se geocodifica.",
+      "textoEnCampoCoordenada": "Mendoza 3949"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Monoblokc Gral Paz 7000",
+      "barrio": "MONOBLOKC GENERAL PAZ 7019",
+      "tipo": "monoblock",
+      "nombre": "Monoblokc 1",
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Monoblokc Gral Paz 7000",
+        "cell": "B3",
+        "row": 3
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Monoblokc Gral Paz 7000",
+      "barrio": "MONOBLOKC GENERAL PAZ 7019",
+      "tipo": "monoblock",
+      "nombre": "Monoblokc 2",
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Monoblokc Gral Paz 7000",
+        "cell": "C3",
+        "row": 3
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Monoblokc Gral Paz 7000",
+      "barrio": "MONOBLOKC GENERAL PAZ 7019",
+      "tipo": "monoblock",
+      "nombre": "Monoblokc 3",
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Monoblokc Gral Paz 7000",
+        "cell": "D3",
+        "row": 3
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Monoblokc Gral Paz 7000",
+      "barrio": "MONOBLOKC GENERAL PAZ 7019",
+      "tipo": "monoblock",
+      "nombre": "Monoblokc 4",
+      "source": {
+        "file": "Fonavis 1 .xlsx",
+        "sheet": "Monoblokc Gral Paz 7000",
+        "cell": "E3",
+        "row": 3
+      },
+      "reason": "sin_coordenadas",
+      "explanation": "El ítem existe pero no tiene coordenadas cargadas."
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 464), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Pje Roca 5800 | T=-31.585997, -60.731836",
+        "ocurrencias": 37433,
+        "primeraFila": 464
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 465), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Pje Roca 5900 | T=-31.585791, -60.732855",
+        "ocurrencias": 37433,
+        "primeraFila": 465
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 468), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=E J Rosas 7700 | T=-31.588931, -60.732038",
+        "ocurrencias": 37433,
+        "primeraFila": 468
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 469), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=E J Rosas 7900 | T=-31.587115, -60.731536",
+        "ocurrencias": 37433,
+        "primeraFila": 469
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 470), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=E J Rosas 7900 | T=-31.586397, -60.731151",
+        "ocurrencias": 37433,
+        "primeraFila": 470
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 471), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Grandoli 7700 | T=-31.588731, -60.733067",
+        "ocurrencias": 37433,
+        "primeraFila": 471
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 472), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Grandoli 7800 | T=-31.587896, -60.732831",
+        "ocurrencias": 37433,
+        "primeraFila": 472
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 473), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Grandoli 7900 | T=-31.586930, -60.732552",
+        "ocurrencias": 37433,
+        "primeraFila": 473
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 474), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Grandoli 8000 | T=-31.586244, -60.732372",
+        "ocurrencias": 37433,
+        "primeraFila": 474
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 475), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Caferatta 7800 | T=-31.587638, -60.733866",
+        "ocurrencias": 37433,
+        "primeraFila": 475
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 476), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Caferatta 8000 | T=-31.585996, -60.733420",
+        "ocurrencias": 37433,
+        "primeraFila": 476
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 477), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Barrio donde se encuentra | T=Rivadavia",
+        "ocurrencias": 37433,
+        "primeraFila": 477
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.433 veces fuera de la zona de datos (desde la fila 479), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Ubicacion General",
+        "ocurrencias": 37433,
+        "primeraFila": 479
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 482), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Ayacucho 5800 | T=-31.589268, -60.732636",
+        "ocurrencias": 37432,
+        "primeraFila": 482
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 483), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Pje S/N 5800 | T=-31.588847, -60.732486",
+        "ocurrencias": 37432,
+        "primeraFila": 483
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 484), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Pavon 5800 | T=-31.588389, -60.732407",
+        "ocurrencias": 37432,
+        "primeraFila": 484
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 485), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Pavon 5900 | T=-31.588172, -60.733402",
+        "ocurrencias": 37432,
+        "primeraFila": 485
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 486), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Pje S/N 5900 | T=-31.587732, -60.733385",
+        "ocurrencias": 37432,
+        "primeraFila": 486
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 487), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Larrea 5800 | T=-31.587474, -60.732149",
+        "ocurrencias": 37432,
+        "primeraFila": 487
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 488), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Larrea 5900 | T=-31.587246, -60.733236",
+        "ocurrencias": 37432,
+        "primeraFila": 488
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 489), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=P S/N 5800 | T=-31.587047, -60.732054",
+        "ocurrencias": 37432,
+        "primeraFila": 489
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 490), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Azcuenaga 5800 | T=-31.586581, -60.731981",
+        "ocurrencias": 37432,
+        "primeraFila": 490
+      }
+    },
+    {
+      "reason": "bloque_huerfano_duplicado",
+      "explanation": "Fila repetida 37.432 veces fuera de la zona de datos (desde la fila 491), sin encabezado ni sección. No se importa.",
+      "fuente": "fonavis",
+      "sheet": "Santa Rita 1",
+      "extra": {
+        "firma": "R=Azcuenaga 5900 | T=-31.586387, -60.733034",
+        "ocurrencias": 37432,
+        "primeraFila": 491
+      }
+    }
+  ],
+  "advertencias": [
+    {
+      "reason": "lejos_del_resto_de_la_hoja",
+      "explanation": "Está a 9.4 km del centro del resto de los puntos de su hoja (límite 2 km). Puede ser correcto, pero conviene verificarlo.",
+      "fuente": "torres",
+      "sheet": "Juan dell Campillo 1300",
+      "barrio": "JUAN DEL CAMPILLO 1300",
+      "nombre": "Edificio con antena alta",
+      "coordRaw": "-31.568461, -60.717921",
+      "cell": "B10",
+      "km": 9.45
+    }
+  ],
+  "celdasSinClasificar": [
+    {
+      "fuente": "fonavis",
+      "sheet": "Gremio Solidario",
+      "cell": "R2",
+      "text": "-31.821746, -60.854709"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Jesuita",
+      "cell": "U2",
+      "text": "-31.821746, -60.854709"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Los Cipreses",
+      "cell": "N3",
+      "text": "Barrio donde se encuentra"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Pte Peron",
+      "cell": "F6",
+      "text": "c"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Pte Peron",
+      "cell": "G6",
+      "text": "c"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Pte Peron",
+      "cell": "H6",
+      "text": "c"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Pte Peron",
+      "cell": "J6",
+      "text": "c"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Pte Peron",
+      "cell": "K6",
+      "text": "c"
+    },
+    {
+      "fuente": "fonavis",
+      "sheet": "Pte Peron",
+      "cell": "L6",
+      "text": "c"
+    }
+  ],
+  "hojasOmitidas": [
+    {
+      "fuente": "fonavis",
+      "hoja": "Hoja4",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 188
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Parque Federal",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Hoja8",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Hoja9",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Hoja10",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Hoja11",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Hoja12",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Hoja13",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Hoja14",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    },
+    {
+      "fuente": "torres",
+      "hoja": "Hoja15",
+      "motivo": "Sin estructura geográfica reconocible (no hay bloques de coordenadas)",
+      "celdas": 0
+    }
+  ]
+}

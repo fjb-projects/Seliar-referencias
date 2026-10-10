@@ -28,6 +28,16 @@ Abre `http://localhost:5173`. El campo de búsqueda tiene el foco al entrar.
 
 Si hay varias coincidencias posibles (por ejemplo `UTN` existe en dos barrios), **no se selecciona ninguna**: se elige con ↑ ↓. Con una única coincidencia clara, Enter la abre directamente.
 
+Cada resultado ofrece tres acciones, todas basadas únicamente en las coordenadas guardadas:
+
+| Acción | Qué hace |
+| --- | --- |
+| **Abrir en Google Maps** | Pin en el punto exacto (es lo que abre Enter). |
+| **Cómo llegar** | Ruta hasta el punto. Sin origen, Google Maps parte de la ubicación del dispositivo; en un celular abre la app instalada. |
+| **Compartir** | Abre el menú de compartir del dispositivo (WhatsApp, SMS, mail…) con nombre, barrio y el enlace del pin. Si el navegador no lo tiene (típico en PC), copia el texto con el enlace al portapapeles. |
+
+> El menú de compartir y la geolocalización del celular sólo funcionan con la app servida por **HTTPS** (en `localhost` también). Probar el menú real de compartir requiere un teléfono.
+
 ## Fuentes de datos (uno o varios Excel)
 
 Todos los libros pasan por el **mismo importador, las mismas validaciones y el mismo buscador**, y terminan en un único catálogo. Las fuentes se declaran en `data-sources.json`:
@@ -67,7 +77,7 @@ Tarda unos 12 segundos porque la hoja `Santa Rita 1` de Fonavis declara más de 
 ## Otros comandos
 
 ```bash
-npm test          # 147 tests (importador, coordenadas, Maps, búsqueda, teclado)
+npm test          # 176 tests (importador, coordenadas, Maps, compartir, búsqueda, teclado)
 npm run typecheck # TypeScript
 npm run build     # build de producción en dist/
 npm run benchmark # compara motores de búsqueda sobre los datos reales

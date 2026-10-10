@@ -4,6 +4,8 @@ import { ResultList, optionId } from './components/ResultList';
 import { loadCatalog } from './lib/catalog';
 import { buildMapsUrlFor } from './lib/maps';
 import { SearchEngine } from './lib/search';
+import { shareReference } from './lib/share';
+import type { Reference } from './lib/types';
 
 const MAX_RESULTS = 10;
 
@@ -69,6 +71,13 @@ export default function App() {
     }
     const url = buildMapsUrlFor(hits[activeIndex].ref);
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const share = async (ref: Reference) => {
+    const outcome = await shareReference(ref);
+    if (outcome === 'copied') setNotice('Enlace copiado al portapapeles: pegalo donde quieras enviarlo.');
+    else if (outcome === 'unavailable') setNotice('Este navegador no permite compartir ni copiar desde acá.');
+    else setNotice(null);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -141,7 +150,7 @@ export default function App() {
             : null)}
       </div>
 
-      {total > 0 && <ResultList hits={hits} activeIndex={activeIndex} listId={listId} onHover={setPicked} />}
+      {total > 0 && <ResultList hits={hits} activeIndex={activeIndex} listId={listId} onHover={setPicked} onShare={share} />}
     </main>
   );
 }

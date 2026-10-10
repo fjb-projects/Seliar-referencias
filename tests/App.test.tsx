@@ -120,6 +120,56 @@ describe('App', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
+  it('offers "Cómo llegar" with a destination-only directions link', async () => {
+    const { user, input } = await setup();
+    await user.type(input, 'gran malvina');
+    const link = await screen.findByRole('link', { name: /cómo llegar a plaza gran malvina/i });
+    expect(link).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/dir/?api=1&destination=-31.566827%2C-60.70427',
+    );
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('shares through the native share sheet with the pin link', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    try {
+      const { user, input } = await setup();
+      await user.type(input, 'gran malvina');
+      await user.click(await screen.findByRole('button', { name: /compartir plaza gran malvina/i }));
+      expect(share).toHaveBeenCalledWith({
+        title: 'Plaza Gran Malvina',
+        text: 'Plaza Gran Malvina · Barrio Favaloro',
+        url: MALVINA_URL,
+      });
+      expect(openSpy).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(navigator, 'share');
+    }
+  });
+
+  it('copies the link and says so when the browser has no share sheet', async () => {
+    const { user, input } = await setup();
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    await user.type(input, 'gran malvina');
+    await user.click(await screen.findByRole('button', { name: /compartir plaza gran malvina/i }));
+    expect(writeText).toHaveBeenCalledWith(`Plaza Gran Malvina · Barrio Favaloro
+${MALVINA_URL}`);
+    expect(screen.getByRole('status')).toHaveTextContent(/enlace copiado/i);
+  });
+
+  it('clears the "copied" notice as soon as the query changes', async () => {
+    const { user, input } = await setup();
+    vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+    await user.type(input, 'gran malvina');
+    await user.click(await screen.findByRole('button', { name: /compartir plaza gran malvina/i }));
+    expect(screen.getByRole('status')).toHaveTextContent(/enlace copiado/i);
+    await user.type(input, 'x');
+    expect(screen.getByRole('status')).not.toHaveTextContent(/enlace copiado/i);
+  });
+
   it('limits the visible results to 10', async () => {
     const { user, input } = await setup();
     await user.type(input, 'ca');

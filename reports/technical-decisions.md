@@ -104,6 +104,13 @@ Se preselecciona un resultado únicamente si es el mejor de su nivel, de nivel e
 
 `src/lib/maps.ts` construye `https://www.google.com/maps/search/?api=1&query=LAT%2CLON` únicamente con las coordenadas almacenadas, sin redondear. Devuelve `null` si no son válidas (la interfaz muestra "Sin coordenadas válidas" en lugar de un enlace) y valida la URL resultante (https, dominio, ruta, `api=1`, consulta numérica). Los enlaces llevan `target="_blank" rel="noopener noreferrer"`; con teclado se abre con `window.open(url, '_blank', 'noopener,noreferrer')`. No se usa geocodificación ni la API de Google Cloud.
 
+### Ruta y compartir (pensado para celulares)
+
+- **Cómo llegar:** `https://www.google.com/maps/dir/?api=1&destination=LAT%2CLON`, sin `origin`. Según la documentación de Google, sin origen se usa la ubicación del dispositivo, y en Android/iOS se abre la app de Google Maps si está instalada. No requiere clave, facturación ni código de geolocalización propio. El validador `isSafeMapsUrl` acepta únicamente esta forma y la del pin, siempre con un par `lat,lon` numérico.
+- **Compartir:** `navigator.share` con nombre, barrio y el enlace del **pin** (no el de ruta: el de ruta depende de dónde esté quien lo recibe). Si el navegador no lo ofrece, o falla por una causa distinta a que el usuario cancele, se copia "texto + enlace" al portapapeles y se avisa. MDN lo marca como disponibilidad limitada y sólo disponible en HTTPS, así que el plan B es necesario. Cancelar el menú no es un error y no copia nada.
+- **Pendiente de verificar en un teléfono real:** la apariencia y el comportamiento del menú nativo de compartir y la apertura de la app de Google Maps desde los enlaces. Los tests cubren la lógica y el plan B, no el dispositivo.
+- **Evaluado y no implementado:** mapa propio dentro de la app (Google Maps JS API, con costo por carga de mapa y clave, o MapLibre + OpenStreetMap) y capa personalizada de Google (My Maps o Datasets API). Ver la investigación en la conversación; no hay cambios en el proyecto por ese motivo.
+
 ## 6. Rendimiento medido
 
 | Métrica | Resultado | Cómo se midió |

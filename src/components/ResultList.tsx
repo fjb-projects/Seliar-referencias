@@ -1,18 +1,20 @@
 import { useEffect, useRef } from 'react';
 import { displayBarrio, formatCoordinates, TIPO_LABEL } from '../lib/format';
-import { buildMapsUrlFor, MAPS_LINK_PROPS } from '../lib/maps';
+import { buildDirectionsUrlFor, buildMapsUrlFor, MAPS_LINK_PROPS } from '../lib/maps';
 import type { SearchHit } from '../lib/search';
+import type { Reference } from '../lib/types';
 
 interface Props {
   hits: SearchHit[];
   activeIndex: number;
   listId: string;
   onHover: (index: number) => void;
+  onShare: (ref: Reference) => void;
 }
 
 export const optionId = (listId: string, index: number) => `${listId}-opt-${index}`;
 
-export function ResultList({ hits, activeIndex, listId, onHover }: Props) {
+export function ResultList({ hits, activeIndex, listId, onHover, onShare }: Props) {
   const activeRef = useRef<HTMLLIElement | null>(null);
 
   useEffect(() => {
@@ -23,6 +25,7 @@ export function ResultList({ hits, activeIndex, listId, onHover }: Props) {
     <ul className="results" role="listbox" id={listId} aria-label="Resultados">
       {hits.map(({ ref }, index) => {
         const url = buildMapsUrlFor(ref);
+        const directionsUrl = buildDirectionsUrlFor(ref);
         const active = index === activeIndex;
         const detail = ref.direccion ?? ref.descripcion;
         const alias = ref.aliases.length ? `Figura en Google Maps como «${ref.aliases.join(', ')}»` : null;
@@ -49,10 +52,32 @@ export function ResultList({ hits, activeIndex, listId, onHover }: Props) {
               {alias ? <div className="result-detail muted">{alias}</div> : null}
               <div className="result-coords muted">{formatCoordinates(ref.latitude, ref.longitude)}</div>
             </div>
-            {url ? (
-              <a className="maps-link" href={url} {...MAPS_LINK_PROPS} tabIndex={-1}>
-                Abrir en Google Maps
-              </a>
+            {url && directionsUrl ? (
+              <div className="result-actions">
+                <a className="maps-link" href={url} {...MAPS_LINK_PROPS} tabIndex={-1}>
+                  Abrir en Google Maps
+                </a>
+                <div className="result-actions-secondary">
+                  <a
+                    className="maps-link is-secondary"
+                    href={directionsUrl}
+                    {...MAPS_LINK_PROPS}
+                    tabIndex={-1}
+                    aria-label={`Cómo llegar a ${ref.nombre}`}
+                  >
+                    Cómo llegar
+                  </a>
+                  <button
+                    type="button"
+                    className="maps-link is-secondary"
+                    tabIndex={-1}
+                    aria-label={`Compartir ${ref.nombre}`}
+                    onClick={() => onShare(ref)}
+                  >
+                    Compartir
+                  </button>
+                </div>
+              </div>
             ) : (
               <span className="maps-link is-disabled">Sin coordenadas válidas</span>
             )}

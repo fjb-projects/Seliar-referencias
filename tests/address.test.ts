@@ -91,14 +91,20 @@ describe('parseAddressQuery', () => {
     ['   ', { streetTokens: [], number: null, crossTokens: null }],
     ['2500', { streetTokens: ['2500'], number: null, crossTokens: null }],
     // a decimal passage name is one token, never a house number
-    ['pje 38.50 1200', { streetTokens: ['38.50'], number: 1200, crossTokens: null }],
-    ['pasaje 34,50 8800', { streetTokens: ['34.50'], number: 8800, crossTokens: null }],
-    ['pje 38.50', { streetTokens: ['38.50'], number: null, crossTokens: null }],
-    ['38.50', { streetTokens: ['38.50'], number: null, crossTokens: null }],
-    ['38,50 1200', { streetTokens: ['38.50'], number: 1200, crossTokens: null }],
+    ['pje 38.50 1200', { streetTokens: ['38.5'], number: 1200, crossTokens: null }],
+    ['pasaje 34,50 8800', { streetTokens: ['34.5'], number: 8800, crossTokens: null }],
+    ['pje 38.50', { streetTokens: ['38.5'], number: null, crossTokens: null }],
+    ['38.50', { streetTokens: ['38.5'], number: null, crossTokens: null }],
+    ['38,50 1200', { streetTokens: ['38.5'], number: 1200, crossTokens: null }],
     ['pje 169.5 2400', { streetTokens: ['169.5'], number: 2400, crossTokens: null }],
-    ['pje publico 98,50 7800', { streetTokens: ['publico', '98.50'], number: 7800, crossTokens: null }],
-    ['pje 38.50 y san martin', { streetTokens: ['38.50'], number: null, crossTokens: ['san', 'martin'] }],
+    ['pje publico 98,50 7800', { streetTokens: ['publico', '98.5'], number: 7800, crossTokens: null }],
+    ['pje 38.50 y san martin', { streetTokens: ['38.5'], number: null, crossTokens: ['san', 'martin'] }],
+    // trailing zeros of the fraction are dropped, one fractional digit is always kept
+    ['pje 40,50', { streetTokens: ['40.5'], number: null, crossTokens: null }],
+    ['pje 40,5', { streetTokens: ['40.5'], number: null, crossTokens: null }],
+    ['pje 173,70', { streetTokens: ['173.7'], number: null, crossTokens: null }],
+    ['pje 12.00 300', { streetTokens: ['12.0'], number: 300, crossTokens: null }],
+    ['pje 10.05 300', { streetTokens: ['10.05'], number: 300, crossTokens: null }],
     // a via-type word counts as the street word before a house number, when a name is left
     ['pje 12 3400', { streetTokens: ['12'], number: 3400, crossTokens: null }],
     ['calle 12', { streetTokens: ['12'], number: null, crossTokens: null }],
@@ -109,6 +115,16 @@ describe('parseAddressQuery', () => {
 
   it.each(cases)('%j', (text, expected) => {
     expect(parseAddressQuery(text)).toEqual(expected);
+  });
+
+  it('reads a trailing unit number literally (known limitation)', () => {
+    // Known literal reading, pinned so a later change is deliberate: the house number is the LAST
+    // 1-5 digit token, so the unit (3) wins and both "2500" and "depto" stay in the street name.
+    expect(parseAddressQuery('san martin 2500 depto 3')).toEqual({
+      streetTokens: ['san', 'martin', '2500', 'depto'],
+      number: 3,
+      crossTokens: null,
+    });
   });
 });
 
@@ -149,29 +165,39 @@ describe('parseCatalogStreet', () => {
     ],
     ['numbered street name', { nombre: 'Sobre 9 de Julio 2500' }, { names: [['9', 'julio']], blocks: [2500] }],
     ['street without number', { nombre: 'Falcon', aliases: ['Falcon'] }, { names: [['falcon']], blocks: [] }],
-    ['decimal name with comma', { nombre: 'Pje 34,50 8800', aliases: ['c'] }, { names: [['34.50'], ['c']], blocks: [8800] }],
+    ['decimal name with comma', { nombre: 'Pje 34,50 8800', aliases: ['c'] }, { names: [['34.5'], ['c']], blocks: [8800] }],
     [
       'decimal name with dot, same alias',
       { nombre: 'Sobre Pje 169.5 2400', direccion: 'Pje 169.5 2400', aliases: ['Pje 169.5'] },
       { names: [['169.5']], blocks: [2400] },
     ],
-    ['decimal name without block', { nombre: 'Pje 173,70' }, { names: [['173.70']], blocks: [] }],
+    ['decimal name without block', { nombre: 'Pje 173,70' }, { names: [['173.7']], blocks: [] }],
     [
       'decimal alias with dot',
       { nombre: 'Pasaje 98,50 7800', aliases: ['Pje Publico 98.50'] },
-      { names: [['98.50'], ['publico', '98.50']], blocks: [7800] },
+      { names: [['98.5'], ['publico', '98.5']], blocks: [7800] },
     ],
     [
       'comma name and dot alias are the same name',
       { nombre: 'Sobre Pje 38,50 8800', aliases: ['Pje 38.50'] },
-      { names: [['38.50']], blocks: [8800] },
+      { names: [['38.5']], blocks: [8800] },
+    ],
+    [
+      'names that differ only by decimal precision are one name',
+      { nombre: 'Sobre Pje 40,50 8800', aliases: ['Pje 40,5'] },
+      { names: [['40.5']], blocks: [8800] },
+    ],
+    [
+      'short main name, padded alias',
+      { nombre: 'Pje 40,5 8800', aliases: ['Pje 40.500', 'Pje Publico 40,50'] },
+      { names: [['40.5'], ['publico', '40.5']], blocks: [8800] },
     ],
     [
       'bare decimal name with trailing comma',
       { nombre: '88,95 8700,', aliases: ['Pje s/n 88,95'] },
       { names: [['88.95'], ['s', 'n', '88.95']], blocks: [8700] },
     ],
-    ['decimal name with double block', { nombre: 'Pje 32,50 8300 / 8400' }, { names: [['32.50']], blocks: [8300, 8400] }],
+    ['decimal name with double block', { nombre: 'Pje 32,50 8300 / 8400' }, { names: [['32.5']], blocks: [8300, 8400] }],
     ['double block', { nombre: 'Diez De Andino 6600 / 6700' }, { names: [['diez', 'andino']], blocks: [6600, 6700] }],
     ['double block, uneven spacing', { nombre: 'Leuman 2100 /2200' }, { names: [['leuman']], blocks: [2100, 2200] }],
     ['double block, no spacing', { nombre: 'Millan Medina 4200/4300' }, { names: [['millan', 'medina']], blocks: [4200, 4300] }],
@@ -229,18 +255,28 @@ describe('gradeStreetName', () => {
     ['9 julio', '9 julio', 'exact'],
     ['1500', '1600', 'none'],
     // decimal names are exact only
-    ['34.50', '34.50', 'exact'],
-    ['34.50', '36.50', 'none'],
-    ['34.50', '34.5', 'none'],
-    ['34.50', '34', 'none'],
-    ['publico 98.50', '98.50', 'none'],
-    ['98.50', 'publico 98.50', 'weak'],
+    ['34.5', '34.5', 'exact'],
+    ['34.5', '36.5', 'none'],
+    ['34.5', '34', 'none'],
+    ['publico 98.5', '98.5', 'none'],
+    ['98.5', 'publico 98.5', 'weak'],
     // initials: match either way, never exact
     ['roque saenz pena', 'r s pena', 'strong'],
     ['r s pena', 'roque saenz pena', 'strong'],
     ['rodriguez', 'm rodriguez', 'strong'],
     ['saenz pena', 'r s pena', 'strong'],
     ['m rodriguez', 'p rodriguez', 'none'],
+    ['m rodriguez', 'monsenor rodriguez', 'strong'],
+    // an initial only assists: some full-word query token must match by the normal rules
+    ['r', 'rivadavia', 'none'],
+    ['r s', 'roque saenz pena', 'none'],
+    ['s', 'san martin', 'none'],
+    ['r', 'r', 'none'],
+    ['s n', 's n', 'none'],
+    ['roque', 'r', 'none'],
+    ['roque s', 'r saenz', 'none'],
+    ['r pena', 'roque pena', 'strong'],
+    ['9', '9 julio', 'weak'],
     // extra candidate tokens
     ['san martin', 'zorrilla san martin', 'weak'],
     ['martin', 'san martin', 'weak'],
@@ -267,6 +303,8 @@ describe('decimal names across query and catalog', () => {
   it.each<[string, StreetGrade]>([
     ['34,50', 'exact'],
     ['34.50', 'exact'],
+    ['34,5', 'exact'],
+    ['pje 34.500', 'exact'],
     ['pje 34,50 8800', 'exact'],
     ['pasaje 34.50', 'exact'],
     ['36,50', 'none'],
@@ -276,7 +314,7 @@ describe('decimal names across query and catalog', () => {
   });
 
   it('grades a comma query against a dot candidate as exact', () => {
-    expect(gradeStreetName(parseAddressQuery('34,50').streetTokens, ['34.50'])).toBe('exact');
+    expect(gradeStreetName(parseAddressQuery('34,50').streetTokens, ['34.5'])).toBe('exact');
   });
 });
 
@@ -297,6 +335,39 @@ describe('bestStreetGrade and gradeRank', () => {
 });
 
 describe.skipIf(!catalogAvailable)('real catalog streets', () => {
+  const decimalPattern = /\d+[.,]\d+/g;
+  /** Independent statement of the rule: dot separator, no trailing zeros, one fractional digit kept. */
+  const canonicalDecimal = (decimal: string) => {
+    const [whole, fraction] = decimal.replace(',', '.').split('.');
+    return `${whole}.${fraction.replace(/0+$/, '') || '0'}`;
+  };
+
+  it('writes every decimal name in its canonical form, in names and aliases alike', () => {
+    const textsOf = (ref: Reference) => [ref.direccion ?? ref.nombre, ...ref.aliases];
+    const decimalStreets = readReferences().filter(
+      (ref) => ref.tipo === 'calle' && textsOf(ref).some((text) => text.match(decimalPattern)),
+    );
+    expect(decimalStreets.length).toBeGreaterThan(0);
+
+    const problems: string[] = [];
+    for (const ref of decimalStreets) {
+      const parsed = parseCatalogStreet(ref)!;
+      const label = textsOf(ref).join(' | ');
+      for (const text of textsOf(ref)) {
+        for (const raw of text.match(decimalPattern) ?? []) {
+          const canonical = canonicalDecimal(raw);
+          if (!parsed.names.some((name) => name.includes(canonical))) problems.push(`${label}: no name holds ${canonical}`);
+        }
+      }
+      for (const token of parsed.names.flat()) {
+        if (/^\d+\.\d+$/.test(token) && token !== canonicalDecimal(token)) problems.push(`${label}: ${token} is not canonical`);
+      }
+      const keys = parsed.names.map((name) => name.join(' '));
+      if (new Set(keys).size !== keys.length) problems.push(`${label}: repeated name`);
+    }
+    expect(problems).toEqual([]);
+  });
+
   it('parses every street record, at least 95% of them with a block', () => {
     const streets = readReferences().filter((ref) => ref.tipo === 'calle');
     expect(streets.length).toBeGreaterThan(0);
@@ -318,8 +389,7 @@ describe.skipIf(!catalogAvailable)('real catalog streets', () => {
   });
 
   it('reads every decimal passage name whole and never takes a block from it', () => {
-    const decimalPattern = /\d+[.,]\d+/g;
-    const decimalsIn = (text: string) => (text.match(decimalPattern) ?? []).map((d) => d.replace(',', '.'));
+    const decimalsIn = (text: string) => (text.match(decimalPattern) ?? []).map(canonicalDecimal);
     const decimalStreets = readReferences().filter(
       (ref) => ref.tipo === 'calle' && decimalsIn(`${ref.nombre} ${ref.direccion ?? ''}`).length > 0,
     );

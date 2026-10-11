@@ -27,6 +27,8 @@ const BETWEEN = 'entre';
 const HOUSE_NUMBER = /^\d{1,5}$/;
 /** A passage named with a decimal ("Pje 34,50", "Pje 169.5"): the whole number is the street name. */
 const DECIMAL_NAME = /^\d+[.,]\d+$/;
+/** Zeros closing the fraction of a decimal, the first fractional digit excluded: the "0" of "40.50". */
+const TRAILING_FRACTION_ZEROS = /(\.\d+?)0+$/;
 /** Runs of letters and digits, kept together across an inner dot or comma so a decimal survives. */
 const WORD_CHUNK = /[\p{L}\p{N}]+(?:[.,][\p{L}\p{N}]+)*/gu;
 const NOT_WORD = /[^\p{L}\p{N}]+/u;
@@ -85,13 +87,21 @@ export function haversineMeters(a: Coordinates, b: Coordinates): number {
 }
 
 /**
+ * One spelling per decimal name, so "40,5" and "40,50" are the same passage: a dot, and no zeros
+ * closing the fraction beyond its first digit. "34,50" -> "34.5", "12.00" -> "12.0".
+ */
+function canonicalDecimal(decimal: string): string {
+  return decimal.replace(',', '.').replace(TRAILING_FRACTION_ZEROS, '$1');
+}
+
+/**
  * Normalised tokens of a street text. Like `splitTokens`, except that a decimal name stays in one
- * piece, always written with a dot: "Pje 34,50 8800," -> [pje, 34.50, 8800].
+ * piece, in its canonical spelling: "Pje 34,50 8800," -> [pje, 34.5, 8800].
  */
 function tokenize(text: string): string[] {
   const tokens: string[] = [];
   for (const chunk of normalizeText(text).match(WORD_CHUNK) ?? []) {
-    if (DECIMAL_NAME.test(chunk)) tokens.push(chunk.replace(',', '.'));
+    if (DECIMAL_NAME.test(chunk)) tokens.push(canonicalDecimal(chunk));
     else tokens.push(...chunk.split(NOT_WORD));
   }
   return tokens;
@@ -263,12 +273,16 @@ function matchToken(query: string, candidate: string, allowPrefix: boolean): Tok
  * - `exact`: same token sequence.
  * - `strong`: every query token pairs with a distinct candidate token (typos within tolerance,
  *   initials allowed) and the candidate has nothing left but single-letter initials.
+ *   An initial only assists: at least one query token of two or more characters, or a number,
+ *   has to pair by itself, so "r" names no street and neither does "roque" against "r".
  * - `weak`: every query token pairs, but the candidate has other tokens left, or the last query
  *   token is only a prefix of its pair.
- * - `none`: some query token has no pair, or the query is empty.
+ * - `none`: some query token has no pair, no full word of the query pairs, or the query is empty.
  */
 export function gradeStreetName(query: string[], candidate: string[]): StreetGrade {
   if (query.length === 0 || candidate.length === 0) return 'none';
+  // Letters alone name nothing, not even a candidate written with the same letters.
+  if (query.every((token) => SINGLE_LETTER.test(token))) return 'none';
   if (query.length === candidate.length && query.every((t, i) => t === candidate[i])) return 'exact';
   if (query.length > candidate.length) return 'none';
 
@@ -277,9 +291,10 @@ export function gradeStreetName(query: string[], candidate: string[]): StreetGra
   let best: StreetGrade = 'none';
 
   // Token lists are a handful of words, so every pairing can be tried.
-  const assign = (index: number, usedPrefix: boolean): void => {
+  const assign = (index: number, usedPrefix: boolean, anchored: boolean): void => {
     if (best === 'strong') return;
     if (index === query.length) {
+      if (!anchored) return;
       const leftover = candidate.some((token, j) => !used[j] && !SINGLE_LETTER.test(token));
       best = usedPrefix || leftover ? 'weak' : 'strong';
       return;
@@ -289,11 +304,13 @@ export function gradeStreetName(query: string[], candidate: string[]): StreetGra
       const match = matchToken(query[index], candidate[j], index === last);
       if (match === null) continue;
       used[j] = true;
-      assign(index + 1, usedPrefix || match === 'prefix');
+      // A full word of the query paired by the normal rules, not through an initial on either side.
+      const anchors = match !== 'initial' && !SINGLE_LETTER.test(query[index]);
+      assign(index + 1, usedPrefix || match === 'prefix', anchored || anchors);
       used[j] = false;
     }
   };
-  assign(0, false);
+  assign(0, false, false);
   return best;
 }
 

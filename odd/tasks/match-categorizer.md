@@ -55,7 +55,7 @@ Not in scope: import scripts, `public/data`, fixing catalog typos (the owner kee
 ## Tasks
 - [x] T1 `src/lib/address.ts` + `tests/address.test.ts`: `parseAddressQuery`, `parseCatalogStreet`, `gradeStreetName`, `blockOf`, `haversineMeters`. Route: delegated writer.
 - [x] T1b `src/lib/address.ts` + tests, data shapes found in the real catalog (user decision 2026-10-11: a decimal passage name such as "Pje 38.50" / "Pje 34,50" / "Pje 169.5" is the street NAME and must be read whole; 34 records): decimal token `d+[.,]d+` is one name token (comma == dot), never a block or house number; a via-type word or a decimal name counts as the name before a house number ("pje 38.50 1200" -> street [38.50], number 1200); double blocks "8300 / 8400" mean the record covers both blocks (`blocks: number[]`); an alias "A / B" with letters on both sides is two names. Route: delegated writer.
-- [ ] T1c `src/lib/address.ts` + tests, from native review: R3-001 a query made only of single-letter tokens must grade `none` (an initial may only assist a match that also has a full-word token); R3-002 pin the current "san martin 2500 depto 3" behavior with a test. Plus the decimal-precision decision if the user takes it. Route: delegated writer.
+- [x] T1c `src/lib/address.ts` + tests, from native review: R3-001 a query made only of single-letter tokens must grade `none` (an initial may only assist a match that also has a full-word token); R3-002 pin the current "san martin 2500 depto 3" behavior with a test. Plus the decimal-precision decision if the user takes it. Route: delegated writer.
 - [ ] T2 `src/lib/georef.ts` + tests: `GeorefHit` gains `calle` and `altura`; new `searchGeorefStreets` (`/calles`, height ranges); never throws. Route: delegated writer.
 - [ ] T3 `src/lib/categorize.ts` + tests, and `src/lib/search.ts`: no fuzzy on tokens containing digits; pure `rankResults(...)` implementing the hierarchy, folding, discrepancy, caps and auto-select. Route: delegated writer.
 - [ ] T4 UI: `App.tsx` queries Georef always (address -> `/direcciones` + `/calles` in parallel; name only -> `/calles`), new unified result list with category + source labels, both street names, stable-key pick; remove the superseded zero-hit-only `GeorefResults`; keep the Maps text-search fallback. Route: delegated writer.
@@ -71,6 +71,8 @@ Not in scope: import scripts, `public/data`, fixing catalog typos (the owner kee
 ## Follow-ups (not in this iteration)
 - Query Georef with the Google alias when the popular name differs.
 - Validate thresholds with the operator; tune caps.
+- "S/N" (sin nombre) passages: treat "s/n" as one token so they stay matchable by name.
+- Ordinals ("1ro de Mayo" vs "1 de mayo") and trailing text after the house number ("depto 3").
 
 ## Delivery
 Strategy: ask-on-risk. Forecast ~1200-1500 authored changed lines (well above 400). Chain strategy: feature-branch-chain (user, 2026-10-11): each task is a small PR targeting the previous one; `main` receives everything at the end. Slice boundaries = one PR per task commit (T1, T1b, T2, T3, T4, T5). No PR created yet; nothing pushed.
@@ -85,6 +87,9 @@ Skill registry `.atl/skill-registry.md`: not present. Engram mirror `odd/match-c
   Open literal readings: decimals are not padded, so "40,5" and "40,50" are different names (some aliases differ from their main name only by precision); slash split applies to aliases only ("Alsina/ martinet 9900" stays one name); "S/N" is protected from the slash split.
 - Native review of slice d931d1c..09a1c6a (T4b fix, README, logging, T1, T1b; 871 lines, medium): consent granted, reliability lens -> approved, acknowledged (lineage review-14093f2c036bbe61, authority burned). Reviewed boundary is now 09a1c6a. Review was run after T1b instead of after T1 because T1b corrected the same unit.
   Advisory findings: R3-001 WARNING src/lib/address.ts:250 single-letter query token grades every street with that initial as `strong` (would flood categories 2-6) -> accepted as T1c, it is a defect inside this feature. R3-002 SUGGESTION address.ts:124 "depto 3" behavior unpinned -> T1c test. R3-003 SUGGESTION src/App.tsx:92-96 unconditional console.log in production -> NOT applied: the logs were an explicit user request; revisit at T4.
+- T1c done (delegated writer). User decision 2026-10-11: "40,5" and "40,50" are the same passage -> decimals canonicalized without trailing zeros ("40.5") in `tokenize`. RED observed (29 failures), address tests 137/137, `npm test` 398/398, typecheck clean, lint only the 2 pre-existing warnings. Parent spot check: 137/137.
+  Real catalog: 34 decimal records canonical; 2 records collapsed alias into main name ("Pje 40,50 8800/8900").
+  Consequences to know: (a) the 6 "Pje S/N <block>" records have only the name [s, n] and can no longer be matched by street name (all-single-letter rule); (b) the 21 records with a one-letter alias "c" no longer match the query "c"; (c) `gradeStreetName` does not canonicalize its inputs, so Georef street names in T2/T3 MUST go through the address.ts tokenizer.
 
 ## Next step
-T1c, then T2.
+T2.

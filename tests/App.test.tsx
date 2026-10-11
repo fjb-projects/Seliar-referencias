@@ -310,6 +310,69 @@ describe('App georef fallback', () => {
     expect(options[0]).toHaveTextContent('XQZV 987651, RECREO');
   });
 
+  it('ArrowUp with no pick selects the last Georef hit', async () => {
+    geoMock.mockResolvedValue(HITS);
+    const { user, input } = await setup();
+    await user.type(input, ADDRESS);
+    const options = await screen.findAllByRole('option');
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveAttribute('aria-activedescendant', options[1].id);
+  });
+
+  it('wraps around the Georef list with ArrowUp and ArrowDown', async () => {
+    geoMock.mockResolvedValue(HITS);
+    const { user, input } = await setup();
+    await user.type(input, ADDRESS);
+    await screen.findAllByRole('option');
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{ArrowUp}');
+    expect(screen.getAllByRole('option')[1]).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveAttribute('aria-activedescendant', screen.getAllByRole('option')[0].id);
+  });
+
+  it('opens the hit picked with ArrowUp then Enter', async () => {
+    geoMock.mockResolvedValue(HITS);
+    const { user, input } = await setup();
+    await user.type(input, ADDRESS);
+    await screen.findAllByRole('option');
+    await user.keyboard('{ArrowUp}{Enter}');
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith(buildMapsUrl(-31.5, -60.75), '_blank', 'noopener,noreferrer');
+  });
+
+  it('does not reuse stale hits after Georef was disabled and re-enabled', async () => {
+    const resolvers: Array<(hits: GeorefHit[]) => void> = [];
+    geoMock.mockImplementation(
+      () =>
+        new Promise<GeorefHit[]>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    const { user, input } = await setup();
+    await user.type(input, ADDRESS);
+    await waitFor(() => expect(resolvers).toHaveLength(1));
+    resolvers[0](HITS);
+    await screen.findAllByRole('option');
+
+    await user.clear(input);
+    await user.type(input, 'comisaria'); // local hits: Georef disabled
+    expect(screen.queryByRole('listbox', { name: 'Direcciones aproximadas' })).not.toBeInTheDocument();
+    await user.clear(input);
+    await user.type(input, ADDRESS);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Buscando dirección aproximada…');
+    expect(screen.queryByRole('listbox', { name: 'Direcciones aproximadas' })).not.toBeInTheDocument();
+    await waitFor(() => expect(resolvers).toHaveLength(2));
+    expect(screen.queryByRole('option')).not.toBeInTheDocument();
+    resolvers[1]([HITS[1]]);
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(1);
+  });
+
   it('aborts the request on unmount', async () => {
     const signals: AbortSignal[] = [];
     geoMock.mockImplementation((_text, signal) => {

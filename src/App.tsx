@@ -53,6 +53,8 @@ function useGeoref(query: string, enabled: boolean): GeorefState {
     return () => {
       clearTimeout(timer);
       controller.abort();
+      // Drop the stored answer so a later re-enable never reports stale hits.
+      setResult(null);
     };
   }, [query, enabled]);
   if (!enabled) return { status: 'idle' };

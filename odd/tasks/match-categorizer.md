@@ -34,6 +34,8 @@ hierarchy, query Georef always (not only when the catalog is empty), and show th
 | 6 | StreetExists | Georef | `/calles` hit grading >= strong, for a locality with no category 3 row and whose range can hold the typed number (out-of-range localities are dropped). Shows the height range. |
 | 7 | Similar | both | Street grade weak (either source), or non-confident engine hits. |
 
+Similar visibility (user decision 2026-10-11): category 7 rows are shown ONLY when categories 0-6 are all empty ("cuando no haya nada mejor"); category 6 is enough to hide them. Inside Similar: weak street-name rows first (catalog, then Georef), then non-confident engine hits; cap 5. Edge: Georef answers later than the catalog, so Similar rows may be visible first and then hidden; a Similar row the operator explicitly picked stays visible (`pinnedKey`).
+
 Initial thresholds (to validate): neighbour = block distance <= 200; agreement = 300 m; typo tolerance for street-name
 tokens = 0 edits under 4 chars, 1 edit for 4-7, 2 edits for 8+ (Damerau, a transposition is one edit); digits never tolerant.
 Street grades: `exact` (same tokens), `strong` (every query token matched within tolerance, candidate has no unmatched

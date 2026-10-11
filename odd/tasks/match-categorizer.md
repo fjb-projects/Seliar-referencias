@@ -54,7 +54,7 @@ Not in scope: import scripts, `public/data`, fixing catalog typos (the owner kee
 
 ## Tasks
 - [x] T1 `src/lib/address.ts` + `tests/address.test.ts`: `parseAddressQuery`, `parseCatalogStreet`, `gradeStreetName`, `blockOf`, `haversineMeters`. Route: delegated writer.
-- [ ] T1b `src/lib/address.ts` + tests, data shapes found in the real catalog (user decision 2026-10-11: a decimal passage name such as "Pje 38.50" / "Pje 34,50" / "Pje 169.5" is the street NAME and must be read whole; 34 records): decimal token `d+[.,]d+` is one name token (comma == dot), never a block or house number; a via-type word or a decimal name counts as the name before a house number ("pje 38.50 1200" -> street [38.50], number 1200); double blocks "8300 / 8400" mean the record covers both blocks (`blocks: number[]`); an alias "A / B" with letters on both sides is two names. Route: delegated writer.
+- [x] T1b `src/lib/address.ts` + tests, data shapes found in the real catalog (user decision 2026-10-11: a decimal passage name such as "Pje 38.50" / "Pje 34,50" / "Pje 169.5" is the street NAME and must be read whole; 34 records): decimal token `d+[.,]d+` is one name token (comma == dot), never a block or house number; a via-type word or a decimal name counts as the name before a house number ("pje 38.50 1200" -> street [38.50], number 1200); double blocks "8300 / 8400" mean the record covers both blocks (`blocks: number[]`); an alias "A / B" with letters on both sides is two names. Route: delegated writer.
 - [ ] T2 `src/lib/georef.ts` + tests: `GeorefHit` gains `calle` and `altura`; new `searchGeorefStreets` (`/calles`, height ranges); never throws. Route: delegated writer.
 - [ ] T3 `src/lib/categorize.ts` + tests, and `src/lib/search.ts`: no fuzzy on tokens containing digits; pure `rankResults(...)` implementing the hierarchy, folding, discrepancy, caps and auto-select. Route: delegated writer.
 - [ ] T4 UI: `App.tsx` queries Georef always (address -> `/direcciones` + `/calles` in parallel; name only -> `/calles`), new unified result list with category + source labels, both street names, stable-key pick; remove the superseded zero-hit-only `GeorefResults`; keep the Maps text-search fallback. Route: delegated writer.
@@ -79,6 +79,9 @@ Skill registry `.atl/skill-registry.md`: not present. Engram mirror `odd/match-c
 - T1 done (delegated writer; trigger: 2 non-trivial files). RED observed (module missing), address tests 75/75, `npm test` 336/336, typecheck clean, lint only the 2 pre-existing warnings. Parent spot check: 75/75. ~480 lines (it.each tables).
   Real catalog: 630/630 calle records parse; 629 have a block (the one without is "Falcon").
   Literal readings to revisit: typo budget uses the shorter token; a query with more tokens than the candidate grades none; house number is the last 1-5 digit token ("san martin 2500 depto 3" -> 3); ordinals ("1ro de Mayo") need exact match; "S/N" becomes [s, n]. Decimals, double blocks and slash aliases are handled in T1b.
+- T1b done (delegated writer). RED observed (39 failed), address tests 117/117, `npm test` 378/378, typecheck clean, lint only the 2 pre-existing warnings. Parent spot check: 117/117 + live probe ("pje 32.50 8350" -> street [32.50], number 8350, catalog "Pje 32,50 8300 / 8400" -> blocks [8300, 8400], grade exact).
+  `CatalogStreet` is now `{ names, blocks: number[] }`. Real catalog: 34 decimal-name records, 12 double-block records, 2 slash aliases; 628/630 have a block (without: "Falcon", "Pje 173,70").
+  Open literal readings: decimals are not padded, so "40,5" and "40,50" are different names (some aliases differ from their main name only by precision); slash split applies to aliases only ("Alsina/ martinet 9900" stays one name); "S/N" is protected from the slash split.
 
 ## Next step
-T1b.
+T2.

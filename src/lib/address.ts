@@ -1,4 +1,4 @@
-import { isStopword, splitTokens } from './normalize';
+import { isStopword, normalizeText } from './normalize';
 import type { Reference } from './types';
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -25,6 +25,17 @@ const BETWEEN = 'entre';
 
 /** A house number or block: 1 to 5 digits, nothing else. */
 const HOUSE_NUMBER = /^\d{1,5}$/;
+/** A passage named with a decimal ("Pje 34,50", "Pje 169.5"): the whole number is the street name. */
+const DECIMAL_NAME = /^\d+[.,]\d+$/;
+/** Runs of letters and digits, kept together across an inner dot or comma so a decimal survives. */
+const WORD_CHUNK = /[\p{L}\p{N}]+(?:[.,][\p{L}\p{N}]+)*/gu;
+const NOT_WORD = /[^\p{L}\p{N}]+/u;
+/** Street text closed by two blocks: "Diez De Andino 6600 / 6700", "Leuman 2100 /2200". */
+const DOUBLE_BLOCK = /^(.*?)(\d{1,5})\s*\/\s*(\d{1,5})[^\p{L}\p{N}]*$/su;
+/** Text the first number of a double block cannot be glued to: a longer number, a word or a decimal. */
+const ENDS_GLUED = /[\p{L}\p{N}.,]$/u;
+/** "S/N" (sin numero) is part of a name, its slash separates nothing. */
+const SIN_NUMERO = /\bs\s*\/\s*n\b/gi;
 const HAS_LETTER = /\p{L}/u;
 const HAS_DIGIT = /\d/;
 const SINGLE_LETTER = /^\p{L}$/u;
@@ -47,8 +58,11 @@ export interface ParsedQuery {
 export interface CatalogStreet {
   /** Popular name tokens first, then each distinct alias. */
   names: string[][];
-  /** Hundred the record marks (8500 stands for 8500-8599), or null when the record has no number. */
-  block: number | null;
+  /**
+   * Hundreds the record marks (8500 stands for 8500-8599), ascending and without repeats.
+   * Two for a record written "8300 / 8400", none when the record has no number.
+   */
+  blocks: number[];
 }
 
 export type StreetGrade = 'exact' | 'strong' | 'weak' | 'none';
@@ -70,20 +84,44 @@ export function haversineMeters(a: Coordinates, b: Coordinates): number {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/**
+ * Normalised tokens of a street text. Like `splitTokens`, except that a decimal name stays in one
+ * piece, always written with a dot: "Pje 34,50 8800," -> [pje, 34.50, 8800].
+ */
+function tokenize(text: string): string[] {
+  const tokens: string[] = [];
+  for (const chunk of normalizeText(text).match(WORD_CHUNK) ?? []) {
+    if (DECIMAL_NAME.test(chunk)) tokens.push(chunk.replace(',', '.'));
+    else tokens.push(...chunk.split(NOT_WORD));
+  }
+  return tokens;
+}
+
 const isNoise = (token: string) => VIA_WORDS.has(token) || isStopword(token);
 const nameTokens = (tokens: string[]) => tokens.filter((t) => !isNoise(t));
 /** A token that can name a street by itself: has a letter and is neither a via-type word nor a stopword. */
 const isAlphabetic = (token: string) => HAS_LETTER.test(token) && !isNoise(token);
+/** A token that names a street by itself: a word, or the decimal of a passage. */
+const namesStreet = (token: string) => isAlphabetic(token) || DECIMAL_NAME.test(token);
 
 /**
- * Index of the house number: the last 1-5 digit token, provided a street word precedes it
+ * Whether the tokens before a number already name a street, so the number can be a house number:
+ * a word ("comisaria 25"), a decimal name ("38.50 1200"), or a via-type word followed by a name of
+ * any kind ("pje 12 3400"). "25 de mayo" and "calle 12" name nothing before their number.
+ */
+function nameStreetBefore(before: string[]): boolean {
+  if (before.some(namesStreet)) return true;
+  return before.some((token) => VIA_WORDS.has(token)) && before.some((token) => !isNoise(token));
+}
+
+/**
+ * Index of the house number: the last 1-5 digit token, provided a street precedes it
  * ("25 de mayo" has none) and it is not the start of a "<n> de <month>" name.
  */
 function houseNumberIndex(tokens: string[]): number {
   for (let i = tokens.length - 1; i >= 0; i--) {
     if (!HOUSE_NUMBER.test(tokens[i])) continue;
-    const afterStreetWord = tokens.slice(0, i).some(isAlphabetic);
-    return afterStreetWord && tokens[i + 1] !== 'de' ? i : -1;
+    return nameStreetBefore(tokens.slice(0, i)) && tokens[i + 1] !== 'de' ? i : -1;
   }
   return -1;
 }
@@ -92,7 +130,7 @@ function houseNumberIndex(tokens: string[]): number {
 function connectorIndex(tokens: string[]): number {
   return tokens.findIndex(
     (token, i) =>
-      CROSS_CONNECTORS.has(token) && tokens.slice(0, i).some(isAlphabetic) && tokens.slice(i + 1).some(isAlphabetic),
+      CROSS_CONNECTORS.has(token) && tokens.slice(0, i).some(namesStreet) && tokens.slice(i + 1).some(namesStreet),
   );
 }
 
@@ -101,12 +139,12 @@ function connectorIndex(tokens: string[]): number {
  * "san martin 2500 esq garay" -> street [san, martin], number 2500, cross [garay].
  */
 export function parseAddressQuery(text: string): ParsedQuery {
-  let tokens = splitTokens(text);
+  let tokens = tokenize(text);
 
   // "rivadavia entre mitre y belgrano": the bounding streets do not name the main one.
   // A leading "entre" is kept, it belongs to a name ("Entre Rios").
   const between = tokens.indexOf(BETWEEN);
-  if (between > 0 && tokens.slice(0, between).some(isAlphabetic)) tokens = tokens.slice(0, between);
+  if (between > 0 && tokens.slice(0, between).some(namesStreet)) tokens = tokens.slice(0, between);
 
   let crossTokens: string[] | null = null;
   const connector = connectorIndex(tokens);
@@ -121,20 +159,44 @@ export function parseAddressQuery(text: string): ParsedQuery {
   return { streetTokens, number, crossTokens };
 }
 
-/** Splits "Cjon Roca 2300," into its name tokens and the block its trailing number falls in. */
-function splitStreetText(text: string): { name: string[]; block: number | null } {
-  const tokens = splitTokens(text);
-  const last = tokens[tokens.length - 1];
-  const head = nameTokens(tokens.slice(0, -1));
-  // The trailing number is a block only when a name is left without it ("Calle 12" keeps its 12).
-  if (last !== undefined && HOUSE_NUMBER.test(last) && head.length > 0) {
-    return { name: head, block: blockOf(Number(last)) };
-  }
-  return { name: nameTokens(tokens), block: null };
+/** Blocks of the given numbers, ascending and without repeats. */
+function blocksOf(numbers: string[]): number[] {
+  return [...new Set(numbers.map((n) => blockOf(Number(n))))].sort((a, b) => a - b);
 }
 
 /**
- * Reads a catalog street record ("Sobre San Martin 8500") as street names plus block.
+ * Splits "Cjon Roca 2300," into its name tokens and the block its trailing number falls in,
+ * or the two blocks of "Roca 2300 / 2400". A decimal is a name, never a block.
+ */
+function splitStreetText(text: string): { name: string[]; blocks: number[] } {
+  // A number is a block only when a name is left without it ("Calle 12" keeps its 12).
+  const double = DOUBLE_BLOCK.exec(text);
+  if (double && !ENDS_GLUED.test(double[1])) {
+    const name = nameTokens(tokenize(double[1]));
+    if (name.length > 0) return { name, blocks: blocksOf([double[2], double[3]]) };
+  }
+
+  const tokens = tokenize(text);
+  const last = tokens[tokens.length - 1];
+  const head = nameTokens(tokens.slice(0, -1));
+  if (last !== undefined && HOUSE_NUMBER.test(last) && head.length > 0) {
+    return { name: head, blocks: blocksOf([last]) };
+  }
+  return { name: nameTokens(tokens), blocks: [] };
+}
+
+/**
+ * Names an alias carries: "Luciano Leiva / Bernardo de Irigoyen" is two streets when every side
+ * of the slash has a letter. A slash between numbers is a double block and "S/N" is a name.
+ */
+function aliasNames(alias: string): string[][] {
+  const parts = alias.replace(SIN_NUMERO, 's n').split('/');
+  const texts = parts.length > 1 && parts.every((part) => HAS_LETTER.test(part)) ? parts : [alias];
+  return texts.map((part) => splitStreetText(part).name);
+}
+
+/**
+ * Reads a catalog street record ("Sobre San Martin 8500") as street names plus blocks.
  * Returns null for any record that is not a street.
  */
 export function parseCatalogStreet(ref: Reference): CatalogStreet | null {
@@ -143,13 +205,13 @@ export function parseCatalogStreet(ref: Reference): CatalogStreet | null {
 
   const names: string[][] = [];
   const seen = new Set<string>();
-  for (const name of [main.name, ...ref.aliases.map((alias) => splitStreetText(alias).name)]) {
+  for (const name of [main.name, ...ref.aliases.flatMap(aliasNames)]) {
     const key = name.join(' ');
     if (name.length === 0 || seen.has(key)) continue;
     seen.add(key);
     names.push(name);
   }
-  return { names, block: main.block };
+  return { names, blocks: main.blocks };
 }
 
 /** Optimal string alignment distance: insert, delete, substitute or swap two adjacent letters, one edit each. */

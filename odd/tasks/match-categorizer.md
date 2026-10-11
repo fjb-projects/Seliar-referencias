@@ -1,0 +1,84 @@
+# Feature: match-categorizer
+
+Branch `feat/match-categorizer`, stacked on `feat/georef-fallback` (not merged, not pushed).
+
+## Objective
+Grade every result of a street/address query with an explicit category, rank catalog and Georef results in ONE
+hierarchy, query Georef always (not only when the catalog is empty), and show the operator why each result is where it is.
+
+## Problem (verified on real data, 2026-10-11)
+- Georef only fires with zero local hits, but weak local hits almost always exist, so it never fires.
+- House numbers are fuzzy/prefix matched (`src/lib/search.ts` options): "san martin 2500" returns "Sobre San Martin 8500".
+- The catalog is a block-level street gazetteer: 630 of 1062 records are `tipo: 'calle'` such as "Sobre San Martin 8500".
+  User-confirmed: each one marks the WHOLE BLOCK (8500-8599). They carry the popular street name plus the Google Maps
+  name as alias (`detalles["En Google Maps figura como"]`), which often differs ("Pje Segundo 4800" -> "F Aguayo").
+- Georef returns no score. `/calles` is fuzzy+prefix and returns height ranges per locality. `/direcciones` can return 0
+  for a street that `/calles` lists ("rivadavia 1500" in Santa Fe capital), so empty != street missing.
+
+## Decisions (user)
+1. Street and house number are graded separately; overall category; source is a separate axis.
+2. House number is compared BY BLOCK (hundred), never fuzzy/prefix.
+3. Street name matches against popular name AND Google alias; both are shown.
+4. Georef is ALWAYS queried; the categorizer ranks everything.
+5. Initial hierarchy and initial thresholds below are provisional ("para iniciar y probar").
+
+## Hierarchy (one list, best first)
+| # | Category | Source | Rule |
+|---|---|---|---|
+| 0 | Reference | catalog | Non-street record with a confident engine match (non-partial, tier <= AllPrefixes). Same as today. |
+| 1 | ConfirmedBlock | catalog+Georef | Category 2 AND a Georef address hit within 300 m (the Georef hit is folded into this row). |
+| 2 | SameBlock | catalog | Street grade >= strong AND same block as the query number. |
+| 3 | Interpolated | Georef | `/direcciones` hit whose street grades >= strong and was not folded into a category 1 row. |
+| 4 | NeighbourBlock | catalog | Street grade >= strong AND block distance 100..200. |
+| 5 | SameStreet | catalog | Street grade >= strong AND (no query number, or block distance > 200, or record without block). |
+| 6 | StreetExists | Georef | `/calles` hit grading >= strong, for a locality with no category 3 row. Shows the height range. |
+| 7 | Similar | both | Street grade weak (either source), or non-confident engine hits. |
+
+Initial thresholds (to validate): neighbour = block distance <= 200; agreement = 300 m; typo tolerance for street-name
+tokens = 0 edits under 4 chars, 1 edit for 4-7, 2 edits for 8+ (Damerau, a transposition is one edit); digits never tolerant.
+Street grades: `exact` (same tokens), `strong` (every query token matched within tolerance, candidate has no unmatched
+tokens other than single-letter initials; an initial matches a token starting with that letter), `weak` (all query tokens
+matched but the candidate has extra tokens, or the last query token only matches as a prefix of >= 3 chars), `none`.
+Via-type words (sobre, calle, av, avda, avenida, bv, boulevard, pje, pasaje, cjon, callejon) and stopwords are ignored when grading.
+
+Street mode is active when the parsed query has a number or an intersection, or when any catalog segment / Georef street
+grades >= strong. Outside street mode the app behaves exactly as today. Disagreement: a category 2 row with a Georef hit in
+locality "Santa Fe" farther than 300 m gets a visible discrepancy note and the Georef hit stays as category 3.
+Auto-select (Enter without a pick): only a single category 0 row as today, or a single category 1/2 row with no category 0
+rival. Georef-only rows are never auto-selected. The pick is tracked by stable key, so late Georef answers cannot move it.
+
+## Authorized scope
+`src/lib/address.ts` (new), `src/lib/categorize.ts` (new), `src/lib/georef.ts`, `src/lib/search.ts`, `src/App.tsx`,
+`src/components/*`, `src/index.css`, `tests/*`, `README.md`, `reports/technical-decisions.md`, this file.
+Not in scope: import scripts, `public/data`, fixing catalog typos (the owner keeps them).
+
+## Tasks
+- [x] T1 `src/lib/address.ts` + `tests/address.test.ts`: `parseAddressQuery`, `parseCatalogStreet`, `gradeStreetName`, `blockOf`, `haversineMeters`. Route: delegated writer.
+- [ ] T1b `src/lib/address.ts` + tests, data shapes found in the real catalog (user decision 2026-10-11: a decimal passage name such as "Pje 38.50" / "Pje 34,50" / "Pje 169.5" is the street NAME and must be read whole; 34 records): decimal token `d+[.,]d+` is one name token (comma == dot), never a block or house number; a via-type word or a decimal name counts as the name before a house number ("pje 38.50 1200" -> street [38.50], number 1200); double blocks "8300 / 8400" mean the record covers both blocks (`blocks: number[]`); an alias "A / B" with letters on both sides is two names. Route: delegated writer.
+- [ ] T2 `src/lib/georef.ts` + tests: `GeorefHit` gains `calle` and `altura`; new `searchGeorefStreets` (`/calles`, height ranges); never throws. Route: delegated writer.
+- [ ] T3 `src/lib/categorize.ts` + tests, and `src/lib/search.ts`: no fuzzy on tokens containing digits; pure `rankResults(...)` implementing the hierarchy, folding, discrepancy, caps and auto-select. Route: delegated writer.
+- [ ] T4 UI: `App.tsx` queries Georef always (address -> `/direcciones` + `/calles` in parallel; name only -> `/calles`), new unified result list with category + source labels, both street names, stable-key pick; remove the superseded zero-hit-only `GeorefResults`; keep the Maps text-search fallback. Route: delegated writer.
+- [ ] T5 README + `reports/technical-decisions.md` + full checks + live probe against real data and the real API.
+
+## Acceptance criteria
+- "san martin 2500" no longer shows "Sobre San Martin 8500" as a match; it is category 5 (or absent if capped) and Georef rows appear.
+- "san martin 8540" shows "Sobre San Martin 8500" as category 1 or 2.
+- "comisaria 25", "torre 3", place names: same results and auto-select behavior as today.
+- Every row in street mode shows category and source; Georef-only rows are never auto-selected.
+- Existing tests stay green, or are changed deliberately with the reason recorded here.
+
+## Follow-ups (not in this iteration)
+- Query Georef with the Google alias when the popular name differs.
+- Validate thresholds with the operator; tune caps.
+
+## Delivery
+Strategy: ask-on-risk. Forecast ~1200-1500 authored changed lines (well above 400). Chain strategy: feature-branch-chain (user, 2026-10-11): each task is a small PR targeting the previous one; `main` receives everything at the end. Slice boundaries = one PR per task commit (T1, T1b, T2, T3, T4, T5). No PR created yet; nothing pushed.
+Skill registry `.atl/skill-registry.md`: not present. Engram mirror `odd/match-categorizer/tasks`: condensed copy + this locator.
+
+## Progress / evidence
+- T1 done (delegated writer; trigger: 2 non-trivial files). RED observed (module missing), address tests 75/75, `npm test` 336/336, typecheck clean, lint only the 2 pre-existing warnings. Parent spot check: 75/75. ~480 lines (it.each tables).
+  Real catalog: 630/630 calle records parse; 629 have a block (the one without is "Falcon").
+  Literal readings to revisit: typo budget uses the shorter token; a query with more tokens than the candidate grades none; house number is the last 1-5 digit token ("san martin 2500 depto 3" -> 3); ordinals ("1ro de Mayo") need exact match; "S/N" becomes [s, n]. Decimals, double blocks and slash aliases are handled in T1b.
+
+## Next step
+T1b.

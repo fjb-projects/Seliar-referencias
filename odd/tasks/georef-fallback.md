@@ -36,7 +36,7 @@ Excluded by the user: Colonia San José.
 - [x] T3 `App.tsx`: georef state machine (idle|loading|ok|empty|error), debounce, only when local hits are empty and query looks like an address; no auto-select.
 - [x] T4 `ResultList.tsx` (or sibling component) + CSS: Georef block with label, locality, fallback link; component tests.
 - [x] T4b Native review R3-001/R3-002 (user accepted): `useGeoref` must not report stale cached hits as `done` after being disabled and re-enabled (must be `loading` until a fresh answer); add tests for that and for ArrowUp / wrap-around in Georef mode. Files: `src/App.tsx`, `tests/App.test.tsx`.
-- [ ] T5 README section + final `typecheck`, `lint`, `test`, `build`.
+- [x] T5 README section + final `typecheck`, `lint`, `test`, `build`.
 
 ## Acceptance criteria
 - Local results behave exactly as before (existing tests stay green).
@@ -80,6 +80,13 @@ Strategy: ask-on-risk. Forecast ~350-450 authored changed lines; slice boundarie
   - R3-001 src/App.tsx:57-58: `useGeoref` keeps its last result after being disabled; returning to a previously searched address shows the cached hits as `done` while a fresh request is also issued, and the newer answer can shift the list under an explicit ArrowDown pick. Untested.
   - R3-002 src/App.tsx:142-146: ArrowUp / wrap-around in Georef mode has no test.
 - T4b done (delegated writer; user accepted R3-001/R3-002). RED observed for the stale-hits regression test; fix is `setResult(null)` in the effect cleanup (lints clean). 5 new App tests (ArrowUp, wrap-around, Enter after ArrowUp, regression). App tests 29/29, `npm test` 261/261, typecheck clean, build OK, lint only the 2 pre-existing warnings. Parent spot check: App tests 29/29 + diff read (+2 lines in src/App.tsx).
+- T5 done (inline: one documentation file, no research needed). README: new "Direcciones aproximadas (Georef)" section, fixed the now-false claims ("sin solicitudes HTTP por consulta", "176 tests"), structure line updated.
+  Final checks: `npm test` 261/261, typecheck clean, build OK, lint only the 2 pre-existing warnings. Live check of `searchGeoref` against the real API (tsx): san martin 2500 -> 3 localities (262 ms), belgrano 1000 -> 3, libertad 500 -> 0, comisaria -> no call. Same results as the curl probes.
+  Not verified: real-browser behavior (CORS verified only with curl headers; UI only through jsdom tests).
 
 ## Next step
-T5 (README + final full checks).
+User decisions: push / PR (not done), slice strategy for delivery, and the open questions below.
+
+## Open questions
+- "rivadavia 1500" / "belgrano 1000" return no Santa Fe capital hit (not investigated).
+- Whether to move to a Vercel function (`/api/georef`) if availability or CORS becomes a problem.

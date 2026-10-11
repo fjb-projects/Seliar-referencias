@@ -1,6 +1,6 @@
 # Buscador de referencias
 
-Buscador instantáneo de referencias georreferenciadas para radiooperadores. Se escribe un lugar, calle o barrio, se identifica la coincidencia correcta y se abre su ubicación exacta en Google Maps. Todo corre en el navegador: sin backend, sin servicios pagos y sin solicitudes HTTP por consulta.
+Buscador instantáneo de referencias georreferenciadas para radiooperadores. Se escribe un lugar, calle o barrio, se identifica la coincidencia correcta y se abre su ubicación exacta en Google Maps. Todo corre en el navegador: sin backend y sin servicios pagos. Las referencias se buscan localmente, sin solicitudes HTTP; sólo cuando no hay ninguna coincidencia y el texto parece una dirección se consulta la API pública Georef (ver [Direcciones aproximadas](#direcciones-aproximadas-georef)).
 
 > **Aviso de privacidad.** Los datos se sirven como archivo estático (`public/data/references.json`) y **no tienen control de acceso**. Si las referencias son internas, no publiques la app sin autenticación. Este proyecto no hace ningún despliegue.
 
@@ -37,6 +37,17 @@ Cada resultado ofrece tres acciones, todas basadas únicamente en las coordenada
 | **Compartir** | Abre el menú de compartir del dispositivo (WhatsApp, SMS, mail…) con nombre, barrio y el enlace del pin. Si el navegador no lo tiene (típico en PC), copia el texto con el enlace al portapapeles. |
 
 > El menú de compartir y la geolocalización del celular sólo funcionan con la app servida por **HTTPS** (en `localhost` también). Probar el menú real de compartir requiere un teléfono.
+
+## Direcciones aproximadas (Georef)
+
+Cuando el catálogo propio **no encuentra nada** y el texto parece una dirección (tiene un número, como `san martin 2500`, o dos calles unidas por " y ", como `san martin y juan de garay`), el buscador consulta [Georef](https://www.argentina.gob.ar/georef/api), la API oficial y gratuita de normalización de direcciones. Si el catálogo tiene al menos una coincidencia, Georef **no se consulta**.
+
+- **Siempre aproximado.** Cada resultado lleva la etiqueta **«Dirección aproximada · Georef»** y la localidad. La coordenada se interpola por altura: puede quedar una o dos cuadras corrida y no es una referencia verificada.
+- **Nunca se selecciona solo.** Aunque haya un único resultado, se elige con ↑ ↓ y Enter. Si se aprieta Enter sin elegir, no se abre nada. La misma calle y altura puede existir en varias localidades.
+- **Respaldo.** Si Georef no responde (tiempo máximo 1,5 s), falla o no encuentra la dirección, se ofrece un enlace de Google Maps que busca por texto.
+- **Zona acotada.** La consulta se limita a estas localidades del departamento La Capital (Santa Fe), definidas en `src/lib/georef.ts` (`GEOREF_LOCALIDADES`, por código de localidad censal INDEC): Santa Fe, Recreo, Monte Vera, Candioti, Angel Gallardo, San José del Rincón, Arroyo Leyes, Santo Tomé y Sauce Viejo. Para sumar o quitar una ciudad se edita esa lista.
+- **Llamada directa desde el navegador.** La API responde con CORS abierto (`Access-Control-Allow-Origin: *`). No requiere clave, pero el servicio público no garantiza disponibilidad; por eso el respaldo es obligatorio. Si la central llegara a depender de Georef, conviene pasar por una función propia (con caché) o instalar la API en un servidor.
+- **Límites conocidos.** Georef no conoce barrios ni lugares: sólo calles y alturas. Algunas calles tienen huecos de datos y pueden dar cero resultados aunque existan (`bv pellegrini`, `av. 7 jefes`).
 
 ## Fuentes de datos (uno o varios Excel)
 
@@ -77,7 +88,7 @@ Tarda unos 12 segundos porque la hoja `Santa Rita 1` de Fonavis declara más de 
 ## Otros comandos
 
 ```bash
-npm test          # 176 tests (importador, coordenadas, Maps, compartir, búsqueda, teclado)
+npm test          # importador, coordenadas, Maps, compartir, búsqueda, Georef, teclado
 npm run typecheck # TypeScript
 npm run build     # build de producción en dist/
 npm run benchmark # compara motores de búsqueda sobre los datos reales
@@ -91,7 +102,7 @@ npm run benchmark # compara motores de búsqueda sobre los datos reales
 data-sources.json   Libros que alimentan el catálogo
 scripts/            Procesamiento del Excel (lectura, parser por secciones, validación, reportes)
 public/data/        Datos normalizados
-src/lib/            Lógica pura: búsqueda, normalización, URLs de Maps, catálogo
+src/lib/            Lógica pura: búsqueda, normalización, URLs de Maps, catálogo, consulta a Georef
 src/components/     Componentes visuales
 reports/            Auditorías, decisiones técnicas, resumen y registros inválidos
 tests/              Tests, incluido el set de relevancia con registros reales (gold.ts)

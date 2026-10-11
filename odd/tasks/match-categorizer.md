@@ -61,6 +61,7 @@ Not in scope: import scripts, `public/data`, fixing catalog typos (the owner kee
 - [x] T2 `src/lib/georef.ts` + tests: `GeorefHit` gains `calle` and `altura`; new `searchGeorefStreets` (`/calles`, height ranges); never throws. Route: delegated writer.
 - [x] T3 `src/lib/categorize.ts` + tests, and `src/lib/search.ts`: no fuzzy on tokens containing digits; pure `rankResults(...)` implementing the hierarchy, folding, discrepancy, caps and auto-select. Route: delegated writer.
 - [x] T4 UI: `App.tsx` queries Georef always (address -> `/direcciones` + `/calles` in parallel; name only -> `/calles`), new unified result list with category + source labels, both street names, stable-key pick; remove the superseded zero-hit-only `GeorefResults`; keep the Maps text-search fallback. Route: delegated writer.
+- [ ] T4b From native review of T4 (defects inside this feature): R3-001 a pick made in the plain list must survive the switch to the ranked list when a late Georef answer turns street mode on (never open a row the operator did not choose); R3-002 a height range with only one known end has unknown direction -> both bounds null (no filtering, no "desde/hasta"). Route: delegated writer.
 - [ ] T5 README + `reports/technical-decisions.md` + full checks + live probe against real data and the real API.
 
 ## Acceptance criteria
@@ -106,6 +107,7 @@ Skill registry `.atl/skill-registry.md`: not present. Engram mirror `odd/match-c
 - T4 done (delegated writer; ~1,000 insertions / 560 deletions, mostly tests; not split). RED observed for categorize (24), RankedResults (module missing) and App (25); `streetQueryText` had no RED (implementation written before its tests). `npm test` 640/640, typecheck clean, build OK, lint only the 2 pre-existing warnings. Parent spot check: full `npm test` 640/640 + typecheck + lint + build.
   Deleted `GeorefResults.tsx` and its test (superseded). New `RankedResults.tsx`, `ReferenceRow.tsx` (shared with `ResultList`, whose first App describe block is byte-identical). The old "App georef fallback" test block was rewritten for the new behavior (34 tests). 10 categorize expectations changed deliberately for the Similar visibility rule.
   Known gaps: (a) outside street mode there is no "Buscando en Georef…" text, so a street only Georef knows (no number, not in catalog) shows "Sin coincidencias" until Georef answers; (b) a pinned Similar row is kept on top of the cap (list can hold 6); (c) hovering a row pins it; (d) "comisaria 25" shows two "Referencia" badges (record type and category); (e) the Maps fallback link sits outside the `role=status` region; (f) `references` kept in state but unused; (g) NOT verified in a real browser (jsdom tests only).
+- Native review of slice 8c2d2b1..e5592b9 (T3 fix + T4, 2221 lines, medium): consent granted, reliability lens -> approved, acknowledged (authority burned). Reviewed boundary is now e5592b9. Findings R3-001 WARNING src/App.tsx:164-170 and R3-002 SUGGESTION src/lib/georef.ts:122-129 accepted as T4b.
 
 ## Next step
-T5.
+T4b, then T5.

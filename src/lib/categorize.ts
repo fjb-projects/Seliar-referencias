@@ -1,6 +1,7 @@
 import {
   bestStreetGrade,
   blockOf,
+  gradeRank,
   gradeStreetName,
   haversineMeters,
   parseCatalogStreet,
@@ -125,8 +126,16 @@ export const catalogKey = (ref: Reference) => `c:${ref.id}`;
 const addressKey = (hit: GeorefHit) => `g:${hit.localidad}|${hit.label}`;
 const streetKey = (street: GeorefStreet) => `s:${street.localidad}|${street.nombre}`;
 
-/** The street the operator typed, as opposed to one that merely resembles it. */
-const namesTheStreet = (grade: StreetGrade) => grade === 'strong' || grade === 'exact';
+/** The whole name of the street, typos and initials aside: the only grades Enter may pick by itself. */
+const namesTheWholeStreet = (grade: StreetGrade | null) => grade === 'strong' || grade === 'exact';
+/** The street the operator typed, by its whole name or by its end, as opposed to one that merely resembles it. */
+const namesTheStreet = (grade: StreetGrade) => namesTheWholeStreet(grade) || grade === 'tail';
+
+/** Best grade first: exact, strong, then tail. Rows of one grade keep the order they come in. */
+function byGrade<T extends { streetGrade: StreetGrade | null }>(rows: T[]): T[] {
+  const rankOf = (row: T) => (row.streetGrade === null ? 0 : gradeRank(row.streetGrade));
+  return [...rows].sort((a, b) => rankOf(b) - rankOf(a));
+}
 
 /** The first value of each key, in the order given. */
 function uniqueBy<T>(values: readonly T[], keyOf: (value: T) => string): T[] {
@@ -324,7 +333,8 @@ function visibleSimilar(similar: RankedItem[], hasBetter: boolean, pinnedKey: st
 
 /**
  * The row Enter picks without asking: the engine's own unambiguous reference when no block row
- * competes, or the single block row when no reference competes. Never a Georef row.
+ * competes, or the single block row when no reference competes and the query is its whole street
+ * name. Never a Georef row, and never a street matched only by the end of its name.
  */
 function autoSelectIndex(items: RankedItem[], engine: SearchResponse): number {
   const isBlockRow = (item: RankedItem) =>
@@ -339,7 +349,8 @@ function autoSelectIndex(items: RankedItem[], engine: SearchResponse): number {
     );
   }
   const hasReference = items.some((item) => item.category === Category.Reference);
-  return !hasReference && blockRows.length === 1 ? items.indexOf(blockRows[0]) : -1;
+  const single = !hasReference && blockRows.length === 1 && namesTheWholeStreet(blockRows[0].streetGrade);
+  return single ? items.indexOf(blockRows[0]) : -1;
 }
 
 /**
@@ -363,7 +374,7 @@ export function rankResults(input: RankInput): RankOutput {
     interpolated.length > 0 ||
     georefStreets.some((row) => row.category === Category.StreetExists);
   // Without a confident engine hit, streets that merely resemble the one typed are the best there
-  // is to show ("grierson" for Georef's "DRA CECILIA GRIERSON"): they are listed as Similar rows.
+  // is to show ("griers" for Georef's "DRA CECILIA GRIERSON"): they are listed as Similar rows.
   const hasConfidentHit = !engine.partial && engine.hits.some((hit) => hit.tier <= Tier.AllPrefixes);
   const onlyResemblances =
     !hasConfidentHit && (streetRows.length > 0 || addressRows.length > 0 || georefStreets.length > 0);
@@ -386,21 +397,28 @@ export function rankResults(input: RankInput): RankOutput {
       ? byBlockDistance(a, b)
       : compareNullsLast(lowest.get(a.ref.id) ?? null, lowest.get(b.ref.id) ?? null);
 
+  // Inside a category of street rows the grade decides first (`byGrade` is a stable sort applied
+  // last), then the order of that category.
   const better: RankedItem[] = [
     // Only engine rows are references, and they are already in engine order.
     ...inCategory(Category.Reference),
-    ...inCategory(Category.ConfirmedBlock).sort(
-      (a, b) => (a.confirmedBy?.distanceM ?? 0) - (b.confirmedBy?.distanceM ?? 0) || byName(a, b),
+    ...byGrade(
+      inCategory(Category.ConfirmedBlock).sort(
+        (a, b) => (a.confirmedBy?.distanceM ?? 0) - (b.confirmedBy?.distanceM ?? 0) || byName(a, b),
+      ),
     ),
-    ...inCategory(Category.SameBlock).sort(byName),
-    ...mainLocalityFirst(remaining, (row) => row.hit.localidad),
-    ...inCategory(Category.NeighbourBlock).sort((a, b) => byBlockDistance(a, b) || byName(a, b)),
-    ...inCategory(Category.SameStreet)
-      .sort((a, b) => bySameStreetOrder(a, b) || byName(a, b))
-      .slice(0, SAME_STREET_CAP),
-    ...mainLocalityFirst(
-      georefStreets.filter((row) => row.category === Category.StreetExists),
-      (row) => row.street.localidad,
+    ...byGrade(inCategory(Category.SameBlock).sort(byName)),
+    ...byGrade(mainLocalityFirst(remaining, (row) => row.hit.localidad)),
+    ...byGrade(inCategory(Category.NeighbourBlock).sort((a, b) => byBlockDistance(a, b) || byName(a, b))),
+    ...byGrade(inCategory(Category.SameStreet).sort((a, b) => bySameStreetOrder(a, b) || byName(a, b))).slice(
+      0,
+      SAME_STREET_CAP,
+    ),
+    ...byGrade(
+      mainLocalityFirst(
+        georefStreets.filter((row) => row.category === Category.StreetExists),
+        (row) => row.street.localidad,
+      ),
     ).slice(0, STREET_EXISTS_CAP),
   ];
 
@@ -412,7 +430,31 @@ export function rankResults(input: RankInput): RankOutput {
     ...georefStreets.filter(isSimilar),
     ...fromEngine.filter(isSimilar),
   ];
-  const items = [...better, ...visibleSimilar(similar, better.length > 0, input.pinnedKey ?? null)];
+  // A street matched only by the end of its name ("Crucero Belgrano" for "belgrano") is a weaker
+  // reading of the query than the street typed, so its rows go after every exact or strong row,
+  // whatever their category. A block Georef confirmed by distance is the exception.
+  const isTailRow = (row: RankedItem) =>
+    row.streetGrade === 'tail' && row.category !== Category.ConfirmedBlock;
+  // References lead the list ("Comisaria 25"), except where the engine itself ranked a record of
+  // the street typed before them: "Alsina 9800" matches "san martin" through an alias prefix and
+  // came after the San Martin blocks in the engine's order, so it stays after them here too.
+  const position = new Map<string, number>();
+  engine.hits.forEach((hit, index) => {
+    if (!position.has(hit.ref.id)) position.set(hit.ref.id, index);
+  });
+  const firstStreetHit = Math.min(
+    ...streetRows.filter((row) => row.category !== Category.Similar).map((row) => position.get(row.ref.id) ?? Infinity),
+  );
+  const isLooseReference = (row: RankedItem) =>
+    row.source === 'catalog' &&
+    row.category === Category.Reference &&
+    (position.get(row.ref.id) ?? -1) > firstStreetHit;
+  const leading = better.filter((row) => !isTailRow(row) && !isLooseReference(row));
+  const ranked = [...leading, ...better.filter(isTailRow), ...better.filter(isLooseReference)];
+  const items = [...ranked, ...visibleSimilar(similar, better.length > 0, input.pinnedKey ?? null)];
 
-  return { streetMode: true, items, autoSelect: autoSelectIndex(items, engine) };
+  // A reference pushed below street rows is no longer the obvious answer, so Enter must not open it.
+  const selected = autoSelectIndex(items, engine);
+  const autoSelect = selected > 0 && items[selected].category === Category.Reference ? -1 : selected;
+  return { streetMode: true, items, autoSelect };
 }

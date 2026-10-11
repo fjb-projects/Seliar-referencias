@@ -19,6 +19,41 @@ const VIA_WORDS = new Set([
   'callejon',
 ]);
 
+/**
+ * Titles official names carry and people leave out ("DRA CECILIA GRIERSON" is "cecilia grierson"),
+ * in their normalised spelling.
+ */
+const TITLE_WORDS = new Set([
+  'dr',
+  'dra',
+  'gral',
+  'general',
+  'cnel',
+  'coronel',
+  'pte',
+  'presidente',
+  'ing',
+  'ingeniero',
+  'mons',
+  'monsenor',
+  'pbro',
+  'fray',
+  'tte',
+  'teniente',
+  'sgto',
+  'sargento',
+  'cap',
+  'capitan',
+  'almte',
+  'almirante',
+  'brig',
+  'brigadier',
+  'prof',
+  'profesor',
+  'don',
+  'dona',
+]);
+
 /** Words that join the two streets of an intersection. */
 const CROSS_CONNECTORS = new Set(['y', 'esquina', 'esq']);
 const BETWEEN = 'entre';
@@ -49,7 +84,7 @@ export interface Coordinates {
 }
 
 export interface ParsedQuery {
-  /** Normalised tokens of the main street, via-type words and stopwords removed. */
+  /** Normalised tokens of the main street, via-type words, stopwords and titles removed. */
   streetTokens: string[];
   /** House number (altura), or null when the query has none. */
   number: number | null;
@@ -67,9 +102,9 @@ export interface CatalogStreet {
   blocks: number[];
 }
 
-export type StreetGrade = 'exact' | 'strong' | 'weak' | 'none';
+export type StreetGrade = 'exact' | 'strong' | 'tail' | 'weak' | 'none';
 
-const GRADE_RANK: Record<StreetGrade, number> = { none: 0, weak: 1, strong: 2, exact: 3 };
+const GRADE_RANK: Record<StreetGrade, number> = { none: 0, weak: 1, tail: 2, strong: 3, exact: 4 };
 
 /** Floors a house number to its hundred: 8540 -> 8500, 99 -> 0. */
 export function blockOf(n: number): number {
@@ -108,12 +143,21 @@ function tokenize(text: string): string[] {
 }
 
 const isNoise = (token: string) => VIA_WORDS.has(token) || isStopword(token);
-const nameTokens = (tokens: string[]) => tokens.filter((t) => !isNoise(t));
+
+/**
+ * The tokens that name the street: via-type words, stopwords and titles are left out. A name made
+ * of titles alone keeps them, so a street called "Coronel" can still be matched.
+ */
+function nameTokens(tokens: string[]): string[] {
+  const withTitles = tokens.filter((token) => !isNoise(token));
+  const named = withTitles.filter((token) => !TITLE_WORDS.has(token));
+  return named.length > 0 ? named : withTitles;
+}
 
 /**
  * Name tokens of a street written by another source (a Georef "SAN MARTIN", "PJE 38.50"), in the
- * spelling queries and catalog streets are compared in: normalised, via-type words and stopwords
- * removed, decimals canonical. No house number is taken out: the text is a name, not an address.
+ * spelling queries and catalog streets are compared in: normalised, via-type words, stopwords and
+ * titles removed, decimals canonical. No house number is taken out: the text is a name, not an address.
  */
 export function streetNameTokens(text: string): string[] {
   return nameTokens(tokenize(text));
@@ -299,16 +343,37 @@ function matchToken(query: string, candidate: string, allowPrefix: boolean): Tok
 }
 
 /**
+ * Whether the query is the end of the candidate: its tokens pair, one by one and in order, with
+ * the last tokens of a longer candidate ("grierson" for "cecilia grierson", "san martin" for
+ * "zorrilla san martin"). Typos within tolerance and initials pair as usual, a prefix does not:
+ * "griers" is text still being typed, not the name of the street. As everywhere, an initial only
+ * assists, so some full word of the query has to pair by itself.
+ */
+function matchesTail(query: string[], candidate: string[]): boolean {
+  const offset = candidate.length - query.length;
+  if (offset <= 0) return false;
+  let anchored = false;
+  for (let i = 0; i < query.length; i++) {
+    const match = matchToken(query[i], candidate[offset + i], false);
+    if (match === null) return false;
+    if (match !== 'initial' && !SINGLE_LETTER.test(query[i])) anchored = true;
+  }
+  return anchored;
+}
+
+/**
  * Grades how well the street the operator typed names a candidate street. Both are normalised
- * token lists without via-type words or stopwords.
+ * token lists without via-type words, stopwords or titles.
  *
  * - `exact`: same token sequence.
  * - `strong`: every query token pairs with a distinct candidate token (typos within tolerance,
  *   initials allowed) and the candidate has nothing left but single-letter initials.
  *   An initial only assists: at least one query token of two or more characters, or a number,
  *   has to pair by itself, so "r" names no street and neither does "roque" against "r".
- * - `weak`: every query token pairs, but the candidate has other tokens left, or the last query
- *   token is only a prefix of its pair.
+ * - `tail`: the query is the end of the candidate, which has other tokens before it: the surname
+ *   of a street named after a person. It still names the street.
+ * - `weak`: every query token pairs, but the candidate has other tokens left that are not before
+ *   the whole query, or the last query token is only a prefix of its pair.
  * - `none`: some query token has no pair, no full word of the query pairs, or the query is empty.
  */
 export function gradeStreetName(query: string[], candidate: string[]): StreetGrade {
@@ -343,10 +408,14 @@ export function gradeStreetName(query: string[], candidate: string[]): StreetGra
     }
   };
   assign(0, false, false);
-  return best;
+  // `assign` sets `best` from inside a closure, which the compiler does not follow.
+  const paired = best as StreetGrade;
+  // A tail is checked last: a candidate with nothing but initials before the query is `strong`.
+  if (paired !== 'strong' && matchesTail(query, candidate)) return 'tail';
+  return paired;
 }
 
-/** Sort key for grades: exact = 3, strong = 2, weak = 1, none = 0. */
+/** Sort key for grades: exact = 4, strong = 3, tail = 2, weak = 1, none = 0. */
 export function gradeRank(grade: StreetGrade): number {
   return GRADE_RANK[grade];
 }

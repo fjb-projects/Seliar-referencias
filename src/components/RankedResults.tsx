@@ -1,7 +1,14 @@
 import { Fragment, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { RankedItem } from '../lib/categorize';
-import { CATEGORY_LABEL, categoryTrust, formatCoordinates, sourceLabel, streetSearchText } from '../lib/format';
+import {
+  CATEGORY_LABEL,
+  categoryTrust,
+  formatCoordinates,
+  sourceLabel,
+  streetSearchText,
+  TAIL_MATCH_NOTE,
+} from '../lib/format';
 import type { GeorefHit, GeorefStreet } from '../lib/georef';
 import { buildDirectionsUrl, buildMapsTextUrl, buildMapsUrl, MAPS_LINK_PROPS } from '../lib/maps';
 import type { Reference } from '../lib/types';
@@ -33,11 +40,17 @@ function RankBadges({ item }: { item: RankedItem }) {
   );
 }
 
-/** What Georef and the typed house number say about a catalog row. */
+/** Tells that the typed text is only the end of the street name, so the operator checks it is the one meant. */
+function TailNote({ item }: { item: RankedItem }) {
+  return item.streetGrade === 'tail' ? <div className="result-detail muted">{TAIL_MATCH_NOTE}</div> : null;
+}
+
+/** What the street name, Georef and the typed house number say about a catalog row. */
 function CatalogNotes({ item }: { item: CatalogItem }) {
   const blocksAway = item.blockDistance === null ? 0 : item.blockDistance / BLOCK_SIZE;
   return (
     <>
+      <TailNote item={item} />
       {item.confirmedBy ? (
         <div className="result-detail muted">Georef coincide a {Math.round(item.confirmedBy.distanceM)} m</div>
       ) : null}
@@ -56,7 +69,7 @@ function CatalogNotes({ item }: { item: CatalogItem }) {
 }
 
 /** An address Georef interpolated: a point on the map, but not a verified one. */
-function AddressRow({ hit, badges }: { hit: GeorefHit; badges: ReactNode }) {
+function AddressRow({ hit, badges, notes }: { hit: GeorefHit; badges: ReactNode; notes: ReactNode }) {
   const title = hit.calle !== '' && hit.altura !== null ? `${hit.calle} ${hit.altura}` : hit.label;
   const url = buildMapsUrl(hit.latitude, hit.longitude);
   const directionsUrl = buildDirectionsUrl(hit.latitude, hit.longitude);
@@ -68,6 +81,7 @@ function AddressRow({ hit, badges }: { hit: GeorefHit; badges: ReactNode }) {
           {badges}
         </div>
         {hit.localidad ? <div className="result-locality">{hit.localidad}</div> : null}
+        {notes}
         <div className="result-coords muted">{formatCoordinates(hit.latitude, hit.longitude)}</div>
         <div className="result-detail muted">Punto interpolado: puede estar corrido una cuadra o dos.</div>
       </div>
@@ -101,7 +115,17 @@ function heightRange({ alturaMin, alturaMax }: GeorefStreet): string | null {
 }
 
 /** A street Georef knows in a locality, with no point on the map: all it offers is a search by name. */
-function StreetRow({ street, queryNumber, badges }: { street: GeorefStreet; queryNumber: number | null; badges: ReactNode }) {
+function StreetRow({
+  street,
+  queryNumber,
+  badges,
+  notes,
+}: {
+  street: GeorefStreet;
+  queryNumber: number | null;
+  badges: ReactNode;
+  notes: ReactNode;
+}) {
   const range = heightRange(street);
   const url = buildMapsTextUrl(streetSearchText(street.nombre, queryNumber), street.localidad);
   return (
@@ -112,6 +136,7 @@ function StreetRow({ street, queryNumber, badges }: { street: GeorefStreet; quer
           {badges}
         </div>
         {street.localidad ? <div className="result-locality">{street.localidad}</div> : null}
+        {notes}
         {range ? <div className="result-detail">{range}</div> : null}
         {queryNumber !== null ? <div className="result-detail muted">No se pudo ubicar la altura {queryNumber}.</div> : null}
       </div>
@@ -131,8 +156,9 @@ function RowBody({ item, queryNumber, onShare }: { item: RankedItem; queryNumber
   if (item.source === 'catalog') {
     return <ReferenceRow reference={item.ref} onShare={onShare} badges={badges} notes={<CatalogNotes item={item} />} />;
   }
-  if (item.kind === 'address') return <AddressRow hit={item.hit} badges={badges} />;
-  return <StreetRow street={item.street} queryNumber={queryNumber} badges={badges} />;
+  const notes = <TailNote item={item} />;
+  if (item.kind === 'address') return <AddressRow hit={item.hit} badges={badges} notes={notes} />;
+  return <StreetRow street={item.street} queryNumber={queryNumber} badges={badges} notes={notes} />;
 }
 
 /**

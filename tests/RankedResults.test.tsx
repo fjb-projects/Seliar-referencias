@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RankedResults } from '../src/components/RankedResults';
 import { Category, type CategoryId, type RankedItem } from '../src/lib/categorize';
-import { formatCoordinates } from '../src/lib/format';
+import type { StreetGrade } from '../src/lib/address';
+import { formatCoordinates, TAIL_MATCH_NOTE } from '../src/lib/format';
 import type { GeorefHit, GeorefStreet } from '../src/lib/georef';
 import { buildDirectionsUrl, buildMapsTextUrl, buildMapsUrl } from '../src/lib/maps';
 import type { Reference } from '../src/lib/types';
@@ -321,6 +322,51 @@ describe('RankedResults', () => {
     it('renders no link when the text URL cannot be built', () => {
       renderList([streetItem({ nombre: 'X'.repeat(250) })]);
       expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('a street matched by the end of its name', () => {
+    const NOTE = 'Coincide con el final del nombre';
+    const withGrade = (item: RankedItem, streetGrade: StreetGrade | null): RankedItem =>
+      ({ ...item, streetGrade }) as RankedItem;
+    const kinds: [string, RankedItem][] = [
+      ['catalog', catalogItem(Category.SameStreet, makeRef('Sobre Zorrilla de San Martin 100'))],
+      ['Georef address', addressItem({ ...HIT, calle: 'DRA CECILIA GRIERSON', altura: 500 })],
+      ['Georef street', streetItem({ nombre: 'DRA CECILIA GRIERSON', localidad: 'Santa Fe' })],
+    ];
+
+    it('exposes the note as shared copy', () => {
+      expect(TAIL_MATCH_NOTE).toBe(NOTE);
+    });
+
+    it.each(kinds)('says so on a %s row', (_kind, item) => {
+      renderList([withGrade(item, 'tail')]);
+      const note = within(options()[0]).getByText(NOTE);
+      expect(note).toHaveClass('result-detail', 'muted');
+      expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    });
+
+    it.each(kinds.flatMap(([kind, item]) => (['exact', 'strong', 'weak'] as const).map((grade) => [kind, grade, item] as const)))(
+      'says nothing on a %s row graded %s',
+      (_kind, grade, item) => {
+        renderList([withGrade(item, grade)]);
+        expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+      },
+    );
+
+    it('says nothing on a row that is there because of the engine', () => {
+      renderList([withGrade(catalogItem(Category.Reference, makeRef('Comisaria 25', { tipo: 'referencia' })), null)]);
+      expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    });
+
+    it('marks only the tail rows of a mixed list', () => {
+      renderList([
+        catalogItem(Category.SameStreet, makeRef('Sobre San Martin 8500')),
+        withGrade(catalogItem(Category.SameStreet, makeRef('Sobre Zorrilla de San Martin 100')), 'tail'),
+        streetItem({ nombre: 'SAN MARTIN' }),
+        withGrade(streetItem({ nombre: 'ZORRILLA DE SAN MARTIN' }), 'tail'),
+      ]);
+      expect(options().map((option) => within(option).queryByText(NOTE) !== null)).toEqual([false, true, false, true]);
     });
   });
 

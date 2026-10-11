@@ -34,6 +34,9 @@ export const CATEGORY_LABEL: Record<number, string> = {
   7: 'Parecido',
 };
 
+/** Note on a street the typed text names only by the last words of its name ("grierson", "DRA CECILIA GRIERSON"). */
+export const TAIL_MATCH_NOTE = 'Coincide con el final del nombre';
+
 /** How far a ranked result can be trusted: a catalog record, a Georef estimate, or a mere resemblance. */
 export type CategoryTrust = 'verified' | 'georef' | 'similar';
 

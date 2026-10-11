@@ -40,7 +40,7 @@ const words = (text: string) => text.split(' ').filter(Boolean);
 describe('streetNameTokens', () => {
   it.each([
     ['SAN MARTIN', ['san', 'martin']],
-    ['AV. GRAL. PAZ', ['gral', 'paz']],
+    ['AV. GRAL. PAZ', ['paz']],
     ['Sobre Pje Neuquén', ['neuquen']],
     ['PJE 38.50', ['38.5']],
     ['Pje 34,50', ['34.5']],
@@ -316,7 +316,7 @@ describe('gradeStreetName', () => {
     ['34.5', '36.5', 'none'],
     ['34.5', '34', 'none'],
     ['publico 98.5', '98.5', 'none'],
-    ['98.5', 'publico 98.5', 'weak'],
+    ['98.5', 'publico 98.5', 'tail'],
     // initials: match either way, never exact
     ['roque saenz pena', 'r s pena', 'strong'],
     ['r s pena', 'roque saenz pena', 'strong'],
@@ -334,9 +334,35 @@ describe('gradeStreetName', () => {
     ['roque s', 'r saenz', 'none'],
     ['r pena', 'roque pena', 'strong'],
     ['9', '9 julio', 'weak'],
-    // extra candidate tokens
-    ['san martin', 'zorrilla san martin', 'weak'],
-    ['martin', 'san martin', 'weak'],
+    // extra candidate tokens before the ones typed: the end of the name
+    ['san martin', 'zorrilla san martin', 'tail'],
+    ['san martin', 'jose san martin', 'tail'],
+    ['martin', 'san martin', 'tail'],
+    ['grierson', 'cecilia grierson', 'tail'],
+    ['belgrano', 'crucero belgrano', 'tail'],
+    ['cecilia grierson', 'cecilia grierson', 'exact'],
+    ['julio', '9 julio', 'tail'],
+    // a typo within tolerance still names the end (the shorter token sets the budget)
+    ['griersno', 'cecilia grierson', 'tail'],
+    ['san matrin', 'zorrilla san martin', 'tail'],
+    ['grieros', 'cecilia grierson', 'none'],
+    ['8 julio', 'avenida 9 julio', 'none'],
+    // a prefix is as-you-type text, it does not name the end of the street
+    ['griers', 'cecilia grierson', 'weak'],
+    ['san mart', 'zorrilla san martin', 'weak'],
+    ['gr', 'cecilia grierson', 'none'],
+    // extra candidate tokens after or between the ones typed, or another order
+    ['san', 'san martin', 'weak'],
+    ['san martin', 'san martin norte', 'weak'],
+    ['cecilia', 'cecilia grierson', 'weak'],
+    ['zorrilla martin', 'zorrilla san martin', 'weak'],
+    ['martin san', 'zorrilla san martin', 'weak'],
+    // an initial only assists the end of a name too
+    ['s martin', 'zorrilla san martin', 'tail'],
+    ['m', 'san martin', 'none'],
+    ['s m', 'jose san martin', 'none'],
+    // only initials before the tokens typed: still the whole name
+    ['san martin', 'j san martin', 'strong'],
     // last query token as a prefix
     ['san mart', 'san martin', 'weak'],
     ['riv', 'rivadavia', 'weak'],
@@ -375,9 +401,101 @@ describe('decimal names across query and catalog', () => {
   });
 });
 
+describe('titles', () => {
+  const TITLES = [
+    'dr', 'dra', 'gral', 'general', 'cnel', 'coronel', 'pte', 'presidente', 'ing', 'ingeniero', 'mons', 'monseñor',
+    'pbro', 'fray', 'tte', 'teniente', 'sgto', 'sargento', 'cap', 'capitan', 'almte', 'almirante', 'brig', 'brigadier',
+    'prof', 'profesor', 'don', 'doña',
+  ];
+
+  it.each(TITLES)('drops "%s" from a street name', (title) => {
+    expect(streetNameTokens(`${title} Lopez`)).toEqual(['lopez']);
+    expect(streetNameTokens(`${title.toUpperCase()}. LOPEZ`)).toEqual(['lopez']);
+    expect(parseAddressQuery(`${title} lopez 1200`)).toEqual({ streetTokens: ['lopez'], number: 1200, crossTokens: null });
+  });
+
+  it.each([
+    ['DRA CECILIA GRIERSON', ['cecilia', 'grierson']],
+    ['AV. PTE. PERON', ['peron']],
+    ['BRIG GRAL ESTANISLAO LOPEZ', ['estanislao', 'lopez']],
+    ['Monseñor Zazpe', ['zazpe']],
+    ['Capitán Bermúdez', ['bermudez']],
+    ['Doña Petrona', ['petrona']],
+    ['Juan Domingo Peron Pte', ['juan', 'domingo', 'peron']],
+    // words that only look like a title are kept
+    ['Santa Fe', ['santa', 'fe']],
+    ['Generoso Donato', ['generoso', 'donato']],
+  ])('"%s" -> %j', (text, expected) => {
+    expect(streetNameTokens(text)).toEqual(expected);
+  });
+
+  it.each([
+    ['Coronel', ['coronel']],
+    ['General', ['general']],
+    ['Av. General', ['general']],
+    ['Sobre Calle Coronel', ['coronel']],
+    ['Tte Gral', ['tte', 'gral']],
+    // via-type words and stopwords are dropped even then
+    ['Calle', []],
+    ['de la', []],
+  ])('keeps the titles of "%s", a name made of nothing else -> %j', (text, expected) => {
+    expect(streetNameTokens(text)).toEqual(expected);
+  });
+
+  it('keeps a street called by a title matchable, with its block', () => {
+    expect(parseCatalogStreet(makeRef({ nombre: 'Sobre Coronel 4500' }))).toEqual({ names: [['coronel']], blocks: [4500] });
+    expect(parseAddressQuery('coronel 4550')).toEqual({ streetTokens: ['coronel'], number: 4550, crossTokens: null });
+    expect(parseAddressQuery('general')).toEqual({ streetTokens: ['general'], number: null, crossTokens: null });
+  });
+
+  it('drops titles from the catalog name and from every alias', () => {
+    expect(parseCatalogStreet(makeRef({ nombre: 'Sobre Gral Paz 6500', aliases: ['Av. General Paz', 'Jose Maria Paz'] }))).toEqual({
+      names: [['paz'], ['jose', 'maria', 'paz']],
+      blocks: [6500],
+    });
+    expect(parseCatalogStreet(makeRef({ nombre: 'Dr Zavalla 2300 / 2400', aliases: ['Don Bosco / Pbro Menvielle'] }))).toEqual({
+      names: [['zavalla'], ['bosco'], ['menvielle']],
+      blocks: [2300, 2400],
+    });
+  });
+
+  it('drops titles from both streets of an intersection', () => {
+    expect(parseAddressQuery('gral lopez 2500 esq dr zavalla')).toEqual({
+      streetTokens: ['lopez'],
+      number: 2500,
+      crossTokens: ['zavalla'],
+    });
+  });
+
+  it('keeps titles in the text sent to the street lookup', () => {
+    expect(streetQueryText('Dra. Cecilia Grierson 500')).toBe('dra cecilia grierson');
+    expect(streetQueryText('gral lopez 2500 esq dr zavalla')).toBe('gral lopez');
+    expect(streetQueryText('coronel')).toBe('coronel');
+  });
+
+  it.each<[string, string, StreetGrade]>([
+    ['grierson', 'DRA CECILIA GRIERSON', 'tail'],
+    ['cecilia grierson', 'DRA CECILIA GRIERSON', 'exact'],
+    ['dra cecilia grierson', 'DRA CECILIA GRIERSON', 'exact'],
+    ['dr grierson', 'DRA CECILIA GRIERSON', 'tail'],
+    ['griers', 'DRA CECILIA GRIERSON', 'weak'],
+    ['cecilia', 'DRA CECILIA GRIERSON', 'weak'],
+    ['gral paz', 'AV GENERAL PAZ', 'exact'],
+    ['paz', 'AV GRAL JOSE MARIA PAZ', 'tail'],
+    ['san martin', 'GRAL JOSE DE SAN MARTIN', 'tail'],
+    ['san martin', 'ZORRILLA DE SAN MARTIN', 'tail'],
+    ['san martin', 'GRAL J DE SAN MARTIN', 'strong'],
+    ['san martin', 'GRAL SAN MARTIN', 'exact'],
+    ['coronel', 'CORONEL', 'exact'],
+    ['coronel', 'CORONEL DORREGO', 'none'],
+  ])('typed %j against the official name %j -> %s', (typed, official, expected) => {
+    expect(gradeStreetName(parseAddressQuery(typed).streetTokens, streetNameTokens(official))).toBe(expected);
+  });
+});
+
 describe('bestStreetGrade and gradeRank', () => {
   it('orders the grades', () => {
-    expect((['none', 'weak', 'strong', 'exact'] as const).map(gradeRank)).toEqual([0, 1, 2, 3]);
+    expect((['none', 'weak', 'tail', 'strong', 'exact'] as const).map(gradeRank)).toEqual([0, 1, 2, 3, 4]);
   });
 
   it.each<[string, string[], StreetGrade]>([
@@ -386,6 +504,9 @@ describe('bestStreetGrade and gradeRank', () => {
     ['san martin', ['zorrilla san martin', 'san matrin'], 'strong'],
     ['mitre', ['segundo', 'f aguayo'], 'none'],
     ['mitre', [], 'none'],
+    ['san martin', ['san martin norte', 'zorrilla san martin'], 'tail'],
+    ['san martin', ['zorrilla san martin', 'j san martin'], 'strong'],
+    ['san martin', ['zorrilla san martin', 'san martin'], 'exact'],
   ])('%j across %j -> %s', (query, names, expected) => {
     expect(bestStreetGrade(words(query), names.map(words))).toBe(expected);
   });
@@ -467,6 +588,35 @@ describe.skipIf(!catalogAvailable)('real catalog streets', () => {
       }
     }
     expect(problems).toEqual([]);
+  });
+
+  it('keeps every street record named once titles are ignored', () => {
+    const TITLE =
+      /^(dr|dra|gral|general|cnel|coronel|pte|presidente|ing|ingeniero|mons|monsenor|pbro|fray|tte|teniente|sgto|sargento|cap|capitan|almte|almirante|brig|brigadier|prof|profesor|don|dona)$/;
+    const plain = (text: string) =>
+      text
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter(Boolean);
+    const streets = readReferences().filter((ref) => ref.tipo === 'calle');
+
+    const withTitle: string[] = [];
+    const unnamed: string[] = [];
+    for (const ref of streets) {
+      const parsed = parseCatalogStreet(ref)!;
+      if (parsed.names.length === 0 || parsed.names.some((name) => name.length === 0)) unnamed.push(ref.nombre);
+      const texts = [ref.direccion ?? ref.nombre, ...ref.aliases];
+      if (texts.some((text) => plain(text).some((word) => TITLE.test(word)))) {
+        withTitle.push(`${texts.join(' | ')} -> ${parsed.names.map((name) => name.join(' ')).join(' | ')}`);
+      }
+    }
+    // Reported, not asserted: the count belongs to the data, which the owner edits.
+    console.info(`[T6] street records holding a title word: ${withTitle.length} of ${streets.length}`);
+    for (const line of withTitle.slice(0, 10)) console.info(`[T6]   ${line}`);
+
+    expect(unnamed).toEqual([]);
   });
 
   it('gives two sorted blocks to every "N / M" record', () => {

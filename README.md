@@ -47,8 +47,8 @@ Cuando la búsqueda es una calle o una dirección, la lista deja de ser la lista
 La lista categorizada se usa cuando se cumple alguna de estas condiciones:
 
 - el texto tiene una altura (`san martin 2500`) o es una intersección (`san martin y juan de garay`, también con `esquina` o `esq`);
-- el texto, sin altura, es el nombre de una calle que el catálogo o Georef reconocen (`san martin`);
-- el motor no encontró ninguna coincidencia confiable y hay calles cuyo nombre se parece al texto (`grierson`, que Georef conoce como «DRA CECILIA GRIERSON»). En ese caso todas las filas son «Parecido».
+- el texto, sin altura, es el nombre de una calle que el catálogo o Georef reconocen, completo (`san martin`) o por sus últimas palabras (`grierson`, que Georef conoce como «DRA CECILIA GRIERSON»);
+- el motor no encontró ninguna coincidencia confiable y hay calles cuyo nombre sólo se parece al texto (`griers`, un apellido a medio escribir). En ese caso todas las filas son «Parecido».
 
 En cualquier otro caso (`utn`, `comisaria`, un barrio) se mantiene la lista simple, con el mismo orden y la misma selección automática de siempre. Un nombre seguido de un número (`comisaria 25`, `torre 3`) se lee como una altura y se muestra en la lista categorizada, pero los resultados son los mismos: aparecen en la categoría «Referencia».
 
@@ -63,7 +63,7 @@ En cualquier otro caso (`utn`, `comisaria`, un barrio) se mantiene la lista simp
 
 ### Categorías
 
-Una fila nunca pasa por delante de otra de mejor categoría. Cada fila muestra dos etiquetas: la categoría y la fuente (`Catálogo`, `Georef` o `Catálogo + Georef`).
+Las filas se ordenan por categoría, de mejor a peor, con dos excepciones. Una calle que coincide sólo por el final de su nombre («Crucero Belgrano» para `belgrano`) va después de todas las filas de la calle escrita, cualquiera sea su categoría, salvo que Georef la haya confirmado por distancia. Y una «Referencia» que el motor había ordenado después de un registro de la calle escrita (por ejemplo, «Alsina 9800» para `san martin`, que coincide por un alias) queda después de las filas de esa calle, y no se abre sola con Enter. Cada fila muestra dos etiquetas: la categoría y la fuente (`Catálogo`, `Georef` o `Catálogo + Georef`).
 
 | # | Etiqueta | Fuente | Qué significa |
 | --- | --- | --- | --- |
@@ -76,7 +76,7 @@ Una fila nunca pasa por delante de otra de mejor categoría. Cada fila muestra d
 | 6 | **La calle existe** | Georef | Georef conoce la calle en esa localidad, pero no ubicó la dirección allí. Muestra el rango de alturas cuando se conoce y sólo ofrece buscar por texto en Google Maps. Hasta 5 filas. |
 | 7 | **Parecido** | Catálogo o Georef | El nombre sólo se parece al escrito, o es una coincidencia del motor sin confianza. Hasta 5 filas. |
 
-Dentro de las filas de Georef, las de la ciudad de Santa Fe van primero. Las filas del catálogo conservan sus tres acciones; una «Dirección interpolada» ofrece abrir el punto y cómo llegar, y «La calle existe» sólo la búsqueda por texto.
+Dentro de cada categoría de calles van primero las filas cuyo nombre coincide mejor (ver «Cómo se compara el nombre de la calle») y después vale el orden propio de la categoría; en las filas de Georef, ese orden pone primero las de la ciudad de Santa Fe. Las filas del catálogo conservan sus tres acciones; una «Dirección interpolada» ofrece abrir el punto y cómo llegar, y «La calle existe» sólo la búsqueda por texto.
 
 ### Cómo se compara la altura
 
@@ -89,10 +89,18 @@ Dentro de las filas de Georef, las de la ciudad de Santa Fe van primero. Las fil
 
 - **Dos nombres por registro.** Se compara contra el nombre popular y contra el nombre con el que figura en Google Maps (alias); la fila muestra ambos. Un alias con dos nombres separados por barra (`Luciano Leiva / Bernardo de Irigoyen`) cuenta como dos.
 - **Palabras que no cuentan.** Se ignoran las que indican el tipo de vía (`sobre`, `calle`, `av`, `avda`, `avenida`, `bv`, `boulevard`, `pje`, `pasaje`, `cjon`, `callejon`) y las palabras vacías (`de`, `del`, `la`, `el`, `los`, `las`, `y`, `en`, `por`, `al`), además de mayúsculas y tildes.
+- **Títulos que no cuentan.** También se ignoran los títulos y grados, estén donde estén en el nombre: `dr`, `dra`, `gral`, `general`, `cnel`, `coronel`, `pte`, `presidente`, `ing`, `ingeniero`, `mons`, `monseñor`, `pbro`, `fray`, `tte`, `teniente`, `sgto`, `sargento`, `cap`, `capitan`, `almte`, `almirante`, `brig`, `brigadier`, `prof`, `profesor`, `don`, `doña`. Vale para el texto escrito, para los nombres y alias del catálogo y para los nombres oficiales de Georef: `cecilia grierson` coincide por completo con «DRA CECILIA GRIERSON», y `gral paz` con «Av General Paz». Si el nombre no tiene más que títulos (una calle llamada «Coronel»), se conservan para que se pueda encontrar. A Georef se le envía el texto tal como se escribió, con sus títulos.
 - **Tolerancia a errores de tipeo según el largo de la palabra:** ninguna en palabras de menos de 4 letras, 1 error en las de 4 a 7 y 2 errores en las de 8 o más. Intercambiar dos letras vecinas cuenta como un solo error. Si las dos palabras tienen distinto largo, manda la más corta. Las palabras con dígitos no tienen tolerancia: `9 de julio` no es `8 de julio`.
 - **Iniciales.** Una letra suelta coincide con una palabra que empieza con esa letra (`f aguayo` con `Francisco Aguayo`, y al revés), pero sólo como ayuda: un texto hecho únicamente de letras sueltas no nombra ninguna calle.
 - **Pasajes con nombre decimal.** En `Pje 38,50` el decimal es el nombre de la calle, no una altura. La coma y el punto son equivalentes y los ceros finales no cuentan: `40,5` y `40,50` son el mismo pasaje. `pje 38.50 1200` se lee como pasaje 38,50 al 1200.
-- **Coincidencia completa o sólo parecida.** La calle coincide cuando todas las palabras escritas tienen su par y al nombre del registro no le sobra nada más que iniciales. Si al registro le sobran palabras, o la última palabra escrita es sólo el comienzo de otra (3 letras o más), el resultado es «Parecido». Si se escriben más palabras que las que tiene el nombre, no coincide.
+- **Coincidencia completa, por el final del nombre o sólo parecida.** Hay tres formas de nombrar la calle, de mejor a peor:
+  1. *Exacta:* las mismas palabras, en el mismo orden.
+  2. *Completa:* todas las palabras escritas tienen su par (con errores de tipeo o iniciales, en cualquier orden) y al nombre del registro no le sobra nada más que iniciales.
+  3. *Por el final del nombre:* las palabras escritas coinciden, en el mismo orden, con las **últimas** palabras del nombre, que tiene otras antes. Es el caso de buscar por apellido: `grierson` nombra «DRA CECILIA GRIERSON»; `san martin` nombra «Zorrilla de San Martin» y «Gral José de San Martin»; `belgrano` nombra «Crucero Belgrano». Cada palabra admite la tolerancia a errores de siempre, pero no alcanza con el comienzo de una palabra.
+
+  Las tres cuentan como la calle escrita y reciben la categoría que corresponda («Misma cuadra», «Cuadra vecina», «Misma calle», «Dirección interpolada», «La calle existe»). Dentro de cada categoría se ordenan así: exactas, completas y por el final del nombre; a igual forma, vale el orden propio de la categoría. Una fila que coincide por el final del nombre lo indica con la nota «Coincide con el final del nombre» y nunca se selecciona sola.
+
+  En cambio, el resultado es «Parecido» si al registro le sobran palabras después o en medio de las escritas (`san` o `san martin` frente a «San Martin Norte»), o si la última palabra escrita es sólo el comienzo de otra, con 3 letras o más (`griers`, `san mart`). Si se escriben más palabras que las que tiene el nombre, no coincide.
 - **Intersecciones.** La calle que cruza se envía a Georef; contra el catálogo se compara sólo la calle principal.
 
 ### Confirmación y discrepancia entre fuentes
@@ -107,7 +115,7 @@ Sólo cuando las categorías 0 a 6 están vacías: alcanza una fila «La calle e
 
 ### Teclado y selección automática
 
-- **Enter sin elegir** abre un resultado únicamente en dos casos: hay una sola «Referencia» clara (la regla de siempre) y ninguna fila de cuadra; o hay una sola fila «Cuadra confirmada» o «Misma cuadra» y ninguna «Referencia». En cualquier otro caso no abre nada y pide elegir con ↑ ↓.
+- **Enter sin elegir** abre un resultado únicamente en dos casos: hay una sola «Referencia» clara (la regla de siempre) y ninguna fila de cuadra; o hay una sola fila «Cuadra confirmada» o «Misma cuadra», ninguna «Referencia», y esa fila no coincide sólo por el final del nombre. En cualquier otro caso no abre nada y pide elegir con ↑ ↓.
 - **Las filas que sólo aporta Georef nunca se seleccionan solas**, aunque sean las únicas. La misma calle y altura puede existir en varias localidades.
 - **La elección del operador no se mueve.** Elegir una fila (con ↑ ↓ o pasando el mouse) la fija: las respuestas de Georef que lleguen después pueden agregar filas arriba o abajo, pero la fila elegida sigue siendo la misma, también si la lista simple se convierte en categorizada. Si la fila elegida dejara de estar en pantalla, Enter no abre nada.
 - En una fila «La calle existe», Enter abre la búsqueda por texto en Google Maps (calle, altura escrita y localidad), porque no hay coordenadas.
@@ -118,6 +126,7 @@ Sólo cuando las categorías 0 a 6 están vacías: alcanza una fila «La calle e
 - **Georef no conoce barrios ni lugares:** sólo calles y alturas.
 - **Sin garantía de disponibilidad.** Es un servicio público; el buscador funciona sin él, sólo con el catálogo.
 - **Pasajes «S/N».** Los registros `Pje S/N <cuadra>` no se encuentran por nombre de calle, porque su nombre son sólo letras sueltas.
+- **Títulos sueltos.** Como los títulos se ignoran, un título solo no encuentra las calles que lo llevan: `coronel` no coincide con «Coronel Dorrego» (sí `dorrego` o `coronel dorrego`).
 - **Ordinales.** `1ro de Mayo` necesita la grafía exacta; `1 de mayo` no coincide.
 - **Texto después de la altura.** En `san martin 2500 depto 3` se toma el `3` como altura y el resto como nombre de calle. Conviene escribir sólo calle y altura.
 - **Calle que sólo conoce Georef, escrita sin altura.** Hasta que Georef responde, la pantalla puede indicar «Sin coincidencias».

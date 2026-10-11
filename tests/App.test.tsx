@@ -588,19 +588,19 @@ describe('App with Georef and the ranked list', () => {
     });
 
     it('keeps a picked row that the ranked list would otherwise hide', async () => {
-      // "martin" only resembles «Sobre San Martin 8500»: once Georef knows a street called MARTIN,
-      // rows like it are hidden, except the one the operator picked.
+      // "san mart" only resembles «Sobre San Martin 8500» (a name typed halfway): once Georef knows
+      // a street called SAN MART, rows like it are hidden, except the one the operator picked.
       const pending = deferred(streetsMock);
-      const picked = engineHits('martin')[0];
+      const picked = engineHits('san mart')[0];
       expect(picked.nombre).toBe('Sobre San Martin 8500');
       const { user, input } = await setup();
-      await user.type(input, 'martin');
+      await user.type(input, 'san mart');
       expect(headings()).toEqual([]);
       await user.keyboard('{ArrowDown}');
       expect(options()[0]).toHaveAttribute('aria-selected', 'true');
 
       await waitFor(() => expect(pending).toHaveLength(1));
-      pending[0].resolve([unknownRange('MARTIN')]);
+      pending[0].resolve([unknownRange('SAN MART')]);
       await waitFor(() => expect(headings()).toContain('La calle existe'));
       expect(headings()[headings().length - 1]).toBe('Parecido');
       expect(selectedName()).toBe('Sobre San Martin 8500');
@@ -671,8 +671,9 @@ describe('App with Georef and the ranked list', () => {
     });
 
     it('shows them when there is nothing better', async () => {
+      // "mart" is a name typed halfway: "martin" would name «San Martin» by the end of its name.
       const { user, input } = await setup();
-      await user.type(input, 'martin 2500');
+      await user.type(input, 'mart 2500');
       await waitFor(() => expect(streetsMock).toHaveBeenCalled());
       await georefAnswered();
       expect(headings()).toEqual(['Parecido']);
@@ -688,16 +689,16 @@ describe('App with Georef and the ranked list', () => {
     it('hides them when Georef finds the street, except the one the operator picked', async () => {
       const pending = deferred(geoMock);
       const { user, input } = await setup();
-      await user.type(input, 'martin 2500');
+      await user.type(input, 'mart 2500');
       expect(headings()).toEqual(['Parecido']);
       await user.keyboard('{ArrowDown}');
       const pickedName = selectedName();
       expect(pickedName).toBe(names()[0]);
 
       await waitFor(() => expect(pending).toHaveLength(1));
-      pending[0].resolve([address('MARTIN', 2500)]);
+      pending[0].resolve([address('MART', 2500)]);
       await waitFor(() => expect(headings()).toEqual(['Dirección interpolada', 'Parecido']));
-      expect(names()).toEqual(['MARTIN 2500', pickedName]);
+      expect(names()).toEqual(['MART 2500', pickedName]);
       expect(selectedName()).toBe(pickedName);
       expect(input).toHaveAttribute('aria-activedescendant', options()[1].id);
     });

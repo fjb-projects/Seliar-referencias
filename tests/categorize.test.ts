@@ -1601,3 +1601,20 @@ describe('a reference the engine matched outside its name ranks after the street
     expect(output.autoSelect).toBe(-1);
   });
 });
+
+describe('a partial engine answer is never confident', () => {
+  // The real engine labels every hit of a partial answer Tier.Partial; this pins that the partial
+  // flag alone decides, so the rule cannot drift if that ever changes.
+  it('lets resemblances turn street mode on even if a hit carries a name tier', () => {
+    const plaza = makeRef('Plaza Gran Malvina');
+    const output = rank('cecilia griers', {
+      engine: engineOf([[plaza, Tier.ExactName]], { partial: true }),
+      streets: [georefStreet('DRA CECILIA GRIERSON', 'Santa Fe', 0, 8999)],
+    });
+    expect(output.streetMode).toBe(true);
+    expect(rows(output)).toEqual([
+      [Category.Similar, 'DRA CECILIA GRIERSON @ Santa Fe'],
+      [Category.Similar, 'Plaza Gran Malvina'],
+    ]);
+  });
+});

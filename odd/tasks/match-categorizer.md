@@ -113,6 +113,7 @@ Skill registry `.atl/skill-registry.md`: not present. Engram mirror `odd/match-c
 - T5 done (delegated writer, documentation only; structural readback by the parent: headings, category table). README: section "Calles y direcciones: categorías y Georef" replaces the old Georef section; false statements fixed. reports/technical-decisions.md: new section 9 with sources. Sections 1, 6 and 7 of that report still say "no hay solicitudes HTTP por consulta"; section 9 supersedes them by note (not edited in place).
   Code facts surfaced while documenting: (a) `/calles` is queried for any text with a 3+ letter word, so place searches like "utn" also send one request; (b) the cross street is parsed but never compared against the catalog; (c) street-name tolerance in address.ts (1 edit 4-7 letters, 2 from 8) differs from the engine tolerance in search.ts (1 edit up to 6, 2 from 7).
   Final state: `npm test` 645/645, typecheck clean, build OK, lint only the 2 pre-existing warnings. Live probe with real catalog + real Georef matches the acceptance criteria. NOT verified: real browser (jsdom only).
+- Native review of slice e5592b9..586f496 (T4b + T5, 454 lines, medium): consent granted, reliability lens -> approved with no findings, acknowledged (authority burned). Reviewed boundary is now 586f496. Every slice of this feature has been reviewed.
 
 ## Next step
 User: try it in a real browser (`npm run dev`), then decide push and the PR chain (feature-branch-chain; nothing pushed, no PR created). Then validate thresholds with the operator.

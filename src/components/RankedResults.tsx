@@ -95,11 +95,9 @@ function AddressRow({ hit, badges }: { hit: GeorefHit; badges: ReactNode }) {
   );
 }
 
+/** The house numbers of the street, told only when both ends are known. */
 function heightRange({ alturaMin, alturaMax }: GeorefStreet): string | null {
-  if (alturaMin !== null && alturaMax !== null) return `Alturas ${alturaMin} a ${alturaMax}`;
-  if (alturaMin !== null) return `Alturas desde ${alturaMin}`;
-  if (alturaMax !== null) return `Alturas hasta ${alturaMax}`;
-  return null;
+  return alturaMin !== null && alturaMax !== null ? `Alturas ${alturaMin} a ${alturaMax}` : null;
 }
 
 /** A street Georef knows in a locality, with no point on the map: all it offers is a search by name. */

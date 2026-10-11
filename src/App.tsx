@@ -4,13 +4,14 @@ import { RankedResults } from './components/RankedResults';
 import { ResultList, optionId } from './components/ResultList';
 import { parseAddressQuery, streetQueryText } from './lib/address';
 import { loadCatalog } from './lib/catalog';
-import { buildStreetIndex, rankResults } from './lib/categorize';
+import { buildStreetIndex, catalogKey, rankResults } from './lib/categorize';
 import type { RankedItem, RankOutput, StreetIndexEntry } from './lib/categorize';
 import { CATEGORY_LABEL, streetSearchText } from './lib/format';
 import { searchGeoref, searchGeorefStreets } from './lib/georef';
 import type { GeorefHit, GeorefStreet } from './lib/georef';
 import { buildMapsTextUrl, buildMapsUrl, buildMapsUrlFor, MAPS_LINK_PROPS } from './lib/maps';
 import { SearchEngine } from './lib/search';
+import type { SearchHit } from './lib/search';
 import { shareReference } from './lib/share';
 import type { Reference } from './lib/types';
 
@@ -20,6 +21,7 @@ const GEOREF_DEBOUNCE_MS = 400;
 const NAMES_A_STREET = /\p{L}{3,}|\d+\.\d+/u;
 const PICK_NOTICE = 'Hay varias coincidencias posibles: elegí una con ↑ ↓ y Enter.';
 const NO_ROWS: RankedItem[] = [];
+const NO_HITS: SearchHit[] = [];
 
 type CatalogState =
   | { status: 'loading' }
@@ -125,9 +127,9 @@ export default function App() {
   const catalog = useCatalog();
   const ready = catalog.status === 'ready';
   const [query, setQuery] = useState('');
-  // Index chosen by the operator in the plain list; null means "follow the engine's suggestion".
-  const [picked, setPicked] = useState<number | null>(null);
-  // Row chosen by the operator in the ranked list, by key: rows Georef adds later cannot move it.
+  // Row chosen by the operator, by key, in whichever list is on screen: rows Georef adds later
+  // cannot move it, and it survives the switch between the plain list and the ranked one.
+  // Null means "follow the suggestion".
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -137,7 +139,7 @@ export default function App() {
     () => (catalog.status === 'ready' ? catalog.engine.search(query, MAX_RESULTS) : null),
     [catalog, query],
   );
-  const hits = response?.hits ?? [];
+  const hits = response?.hits ?? NO_HITS;
   const total = hits.length;
 
   const trimmed = query.trim();
@@ -163,12 +165,16 @@ export default function App() {
 
   const streetMode = rank?.streetMode ?? false;
   const items = rank?.streetMode ? rank.items : NO_ROWS;
-  // A pick whose row is gone counts as no pick.
-  const pickedIndex = pickedKey === null ? -1 : items.findIndex((item) => item.key === pickedKey);
-  const rankedActive = pickedIndex >= 0 ? pickedIndex : (rank?.autoSelect ?? -1);
-  const plainActive = picked !== null && picked < total ? picked : (response?.autoSelect ?? -1);
-  const activeIndex = streetMode ? rankedActive : plainActive;
-  const rowCount = streetMode ? items.length : total;
+  // The keys of the rows on screen, in order. A catalog record has the same key in both lists.
+  const rowKeys = useMemo(
+    () => (streetMode ? items.map((item) => item.key) : hits.map((hit) => catalogKey(hit.ref))),
+    [streetMode, items, hits],
+  );
+  const suggested = (streetMode ? rank?.autoSelect : response?.autoSelect) ?? -1;
+  // The suggestion only stands in while the operator has picked nothing. A pick whose row is not
+  // on screen leaves no active row: Enter must never open a row the operator did not choose.
+  const activeIndex = pickedKey === null ? suggested : rowKeys.indexOf(pickedKey);
+  const rowCount = rowKeys.length;
 
   // One trace line per ranking: when the query settles and again when Georef answers, never per render.
   const traceRef = useRef('');
@@ -199,7 +205,6 @@ export default function App() {
 
   const changeQuery = (value: string) => {
     setQuery(value);
-    setPicked(null);
     setPickedKey(null);
     setNotice(null);
   };
@@ -220,15 +225,7 @@ export default function App() {
   };
 
   /** Moves the pick to another row of the list on screen, by its index. */
-  const pickRow = (index: number) => {
-    if (streetMode) setPickedKey(items[index].key);
-    else setPicked(index);
-  };
-  const hasPick = streetMode ? pickedIndex >= 0 : picked !== null;
-  const clearPick = () => {
-    setPicked(null);
-    setPickedKey(null);
-  };
+  const pickRow = (index: number) => setPickedKey(rowKeys[index]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     switch (e.key) {
@@ -248,7 +245,7 @@ export default function App() {
         break;
       case 'Escape':
         e.preventDefault();
-        if (hasPick) clearPick();
+        if (pickedKey !== null) setPickedKey(null);
         else changeQuery('');
         break;
     }
@@ -324,7 +321,7 @@ export default function App() {
         />
       )}
       {!streetMode && total > 0 && (
-        <ResultList hits={hits} activeIndex={activeIndex} listId={listId} onHover={setPicked} onShare={share} />
+        <ResultList hits={hits} activeIndex={activeIndex} listId={listId} onHover={pickRow} onShare={share} />
       )}
     </main>
   );

@@ -307,9 +307,10 @@ describe('RankedResults', () => {
     it.each<[number | null, number | null, string | null]>([
       [100, 1999, 'Alturas 100 a 1999'],
       [0, 9699, 'Alturas 0 a 9699'],
-      [100, null, 'Alturas desde 100'],
-      [null, 1999, 'Alturas hasta 1999'],
       [null, null, null],
+      // Georef never sends half a range; if one arrived, it would say nothing rather than guess.
+      [100, null, null],
+      [null, 1999, null],
     ])('tells the height range %s-%s as %j', (alturaMin, alturaMax, text) => {
       renderList([streetItem({ alturaMin, alturaMax })]);
       const [row] = options();

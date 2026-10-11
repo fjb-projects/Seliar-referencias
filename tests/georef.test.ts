@@ -317,10 +317,11 @@ describe('searchGeorefStreets', () => {
     ['an inverted range (inicio above fin)', range(9698, 9699, 0, 1), 0, 9699],
     ['an inverted range with asymmetric sides', range(900, 901, 101, 100), 100, 901],
     ['one side inverted only', range(100, 950, 900, 101), 100, 950],
-    // Both bounds come from every finite side value, so one known end bounds the street by itself.
-    ['no finite start (lower bound stays unknown)', range(null, undefined, 800, 801), null, 801],
-    ['no finite end (upper bound stays unknown)', range(100, 101, null, 'x'), 100, null],
-    ['a single finite side', range(null, null, 700, null), null, 700],
+    // With one end missing nobody knows which way the street runs, so neither bound is known.
+    ['no finite start', range(null, undefined, 800, 801), null, null],
+    ['no finite end', range(100, 101, null, 'x'), null, null],
+    ['a single finite side', range(null, null, 700, null), null, null],
+    ['one-ended zero (inicio 0/0, fin missing)', { inicio: { derecha: 0, izquierda: 0 } }, null, null],
     ['numeric strings (not numbers)', range('100', '101', '900', '901'), null, null],
     ['missing inicio and fin', {}, null, null],
     ['null inicio and fin', { inicio: null, fin: null }, null, null],

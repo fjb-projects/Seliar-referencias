@@ -120,7 +120,8 @@ export function buildStreetIndex(references: Reference[]): StreetIndexEntry[] {
   return index;
 }
 
-const catalogKey = (ref: Reference) => `c:${ref.id}`;
+/** Stable key of a catalog row, shared with the plain list so a pick survives a list switch. */
+export const catalogKey = (ref: Reference) => `c:${ref.id}`;
 const addressKey = (hit: GeorefHit) => `g:${hit.localidad}|${hit.label}`;
 const streetKey = (street: GeorefStreet) => `s:${street.localidad}|${street.nombre}`;
 

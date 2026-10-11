@@ -4,7 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { buildMapsTextUrl, buildMapsUrl } from '../src/lib/maps';
+import { rankResults } from '../src/lib/categorize';
 import { searchGeoref, searchGeorefStreets, type GeorefHit, type GeorefStreet } from '../src/lib/georef';
+import { SearchEngine } from '../src/lib/search';
 import { readCatalog } from './helpers';
 
 vi.mock('../src/lib/georef', async () => ({
@@ -13,14 +15,26 @@ vi.mock('../src/lib/georef', async () => ({
   searchGeorefStreets: vi.fn(async () => []),
 }));
 
+// The real ranking, wrapped only so that one test can take a row out of its answer.
+vi.mock('../src/lib/categorize', async () => {
+  const actual = await vi.importActual<typeof import('../src/lib/categorize')>('../src/lib/categorize');
+  return { ...actual, rankResults: vi.fn(actual.rankResults) };
+});
+
 const geoMock = vi.mocked(searchGeoref);
 const streetsMock = vi.mocked(searchGeorefStreets);
+const rankMock = vi.mocked(rankResults);
 const catalog = readCatalog();
 const MALVINA_URL = 'https://www.google.com/maps/search/?api=1&query=-31.566827%2C-60.70427';
 
 let openSpy: ReturnType<typeof vi.fn>;
+let realRankResults: typeof rankResults;
 
-beforeEach(() => {
+beforeEach(async () => {
+  const actual = await vi.importActual<typeof import('../src/lib/categorize')>('../src/lib/categorize');
+  realRankResults = actual.rankResults;
+  rankMock.mockReset();
+  rankMock.mockImplementation(realRankResults);
   geoMock.mockReset();
   geoMock.mockImplementation(async () => []);
   streetsMock.mockReset();
@@ -545,6 +559,104 @@ describe('App with Georef and the ranked list', () => {
       expect(badgesOf(rowNamed('Comisaria 25'))).toEqual(['Referencia', 'Referencia', 'Catálogo']);
       await user.keyboard('{Enter}');
       expect(openSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('a plain list that becomes ranked when Georef answers late', () => {
+    const unknownRange = (nombre: string): GeorefStreet => ({ nombre, localidad: 'Recreo', alturaMin: null, alturaMax: null });
+    const engineHits = (text: string) => new SearchEngine(catalog.references).search(text, 10).hits.map((hit) => hit.ref);
+    const urlOf = (ref: { latitude: number; longitude: number }) => buildMapsUrl(ref.latitude, ref.longitude);
+
+    it('keeps the pick on the same reference, and Enter opens it', async () => {
+      const pending = deferred(streetsMock);
+      const picked = engineHits('utn')[1];
+      const { user, input } = await setup();
+      await user.type(input, 'utn');
+      expect(headings()).toEqual([]);
+      await user.keyboard('{ArrowDown}{ArrowDown}');
+      expect(options()[1]).toHaveAttribute('aria-selected', 'true');
+
+      await waitFor(() => expect(pending).toHaveLength(1));
+      pending[0].resolve([unknownRange('UTN')]);
+      await waitFor(() => expect(headings()).toEqual(['Referencia', 'La calle existe']));
+      expect(options().map((option) => option.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false', 'false']);
+      expect(selectedName()).toBe(picked.nombre);
+      expect(input).toHaveAttribute('aria-activedescendant', options()[1].id);
+      await user.keyboard('{Enter}');
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(openSpy).toHaveBeenCalledWith(urlOf(picked), '_blank', 'noopener,noreferrer');
+    });
+
+    it('keeps a picked row that the ranked list would otherwise hide', async () => {
+      // "martin" only resembles «Sobre San Martin 8500»: once Georef knows a street called MARTIN,
+      // rows like it are hidden, except the one the operator picked.
+      const pending = deferred(streetsMock);
+      const picked = engineHits('martin')[0];
+      expect(picked.nombre).toBe('Sobre San Martin 8500');
+      const { user, input } = await setup();
+      await user.type(input, 'martin');
+      expect(headings()).toEqual([]);
+      await user.keyboard('{ArrowDown}');
+      expect(options()[0]).toHaveAttribute('aria-selected', 'true');
+
+      await waitFor(() => expect(pending).toHaveLength(1));
+      pending[0].resolve([unknownRange('MARTIN')]);
+      await waitFor(() => expect(headings()).toContain('La calle existe'));
+      expect(headings()[headings().length - 1]).toBe('Parecido');
+      expect(selectedName()).toBe('Sobre San Martin 8500');
+      const row = options()[options().length - 1];
+      expect(row).toHaveAttribute('aria-selected', 'true');
+      expect(input).toHaveAttribute('aria-activedescendant', row.id);
+      await user.keyboard('{Enter}');
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(openSpy).toHaveBeenCalledWith(urlOf(picked), '_blank', 'noopener,noreferrer');
+    });
+
+    it('selects nothing and opens nothing when the picked reference is not in the ranked list', async () => {
+      // The real ranking keeps every engine hit (a picked one is pinned), so no query over the real
+      // catalog loses the picked row. The ranking is wrapped to drop it, and to suggest another row.
+      const [picked, other] = engineHits('utn');
+      rankMock.mockImplementation((input) => {
+        const output = realRankResults(input);
+        if (!output.streetMode) return output;
+        return { ...output, items: output.items.filter((item) => item.key !== `c:${picked.id}`), autoSelect: 0 };
+      });
+      const pending = deferred(streetsMock);
+      const { user, input } = await setup();
+      await user.type(input, 'utn');
+      expect(headings()).toEqual([]);
+      await user.keyboard('{ArrowDown}');
+      expect(options()[0]).toHaveAttribute('aria-selected', 'true');
+
+      await waitFor(() => expect(pending).toHaveLength(1));
+      pending[0].resolve([unknownRange('UTN')]);
+      await waitFor(() => expect(headings()).toEqual(['Referencia', 'La calle existe']));
+      expect(options()).toHaveLength(3);
+      expect(options().every((option) => option.getAttribute('aria-selected') === 'false')).toBe(true);
+      expect(input).not.toHaveAttribute('aria-activedescendant');
+      await user.keyboard('{Enter}');
+      expect(openSpy).not.toHaveBeenCalled();
+      expect(status()).toHaveTextContent('Hay varias coincidencias posibles: elegí una con ↑ ↓ y Enter.');
+      expect(options().every((option) => option.getAttribute('aria-selected') === 'false')).toBe(true);
+
+      // The operator can still choose among the rows that are there.
+      await user.keyboard('{ArrowDown}{Enter}');
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(openSpy).toHaveBeenCalledWith(urlOf(other), '_blank', 'noopener,noreferrer');
+    });
+
+    it('still opens the single strong match with Enter when the operator picked nothing', async () => {
+      const pending = deferred(streetsMock);
+      const { user, input } = await setup();
+      await user.type(input, 'plaza gran malvina');
+      expect(headings()).toEqual([]);
+      await waitFor(() => expect(pending).toHaveLength(1));
+      pending[0].resolve([unknownRange('PLAZA GRAN MALVINA')]);
+      await waitFor(() => expect(headings()).toEqual(['Referencia', 'La calle existe']));
+      expect(rowNamed('Plaza Gran Malvina')).toHaveAttribute('aria-selected', 'true');
+      await user.keyboard('{Enter}');
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      expect(openSpy).toHaveBeenCalledWith(MALVINA_URL, '_blank', 'noopener,noreferrer');
     });
   });
 

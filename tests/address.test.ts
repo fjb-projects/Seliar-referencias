@@ -9,6 +9,7 @@ import {
   haversineMeters,
   parseAddressQuery,
   parseCatalogStreet,
+  streetNameTokens,
   type ParsedQuery,
   type StreetGrade,
 } from '../src/lib/address';
@@ -34,6 +35,34 @@ function makeRef(overrides: Partial<Reference>): Reference {
 }
 
 const words = (text: string) => text.split(' ').filter(Boolean);
+
+describe('streetNameTokens', () => {
+  it.each([
+    ['SAN MARTIN', ['san', 'martin']],
+    ['AV. GRAL. PAZ', ['gral', 'paz']],
+    ['Sobre Pje Neuquén', ['neuquen']],
+    ['PJE 38.50', ['38.5']],
+    ['Pje 34,50', ['34.5']],
+    ['9 DE JULIO', ['9', 'julio']],
+    ['', []],
+    ['Calle', []],
+  ])('"%s" -> %j', (text, expected) => {
+    expect(streetNameTokens(text)).toEqual(expected);
+  });
+
+  it('keeps a trailing number as part of the name: it extracts no house number', () => {
+    expect(streetNameTokens('San Martin 2500')).toEqual(['san', 'martin', '2500']);
+    expect(streetNameTokens('CALLE 12')).toEqual(['12']);
+  });
+
+  it('gives an official name the spelling the query parser produces', () => {
+    const query = parseAddressQuery('pje 38,5 1200');
+    expect(gradeStreetName(query.streetTokens, streetNameTokens('PJE 38.50'))).toBe('exact');
+    expect(gradeStreetName(parseAddressQuery('san martin 2500').streetTokens, streetNameTokens('SAN MARTIN'))).toBe(
+      'exact',
+    );
+  });
+});
 
 describe('blockOf', () => {
   it.each([

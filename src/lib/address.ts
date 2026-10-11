@@ -109,6 +109,16 @@ function tokenize(text: string): string[] {
 
 const isNoise = (token: string) => VIA_WORDS.has(token) || isStopword(token);
 const nameTokens = (tokens: string[]) => tokens.filter((t) => !isNoise(t));
+
+/**
+ * Name tokens of a street written by another source (a Georef "SAN MARTIN", "PJE 38.50"), in the
+ * spelling queries and catalog streets are compared in: normalised, via-type words and stopwords
+ * removed, decimals canonical. No house number is taken out: the text is a name, not an address.
+ */
+export function streetNameTokens(text: string): string[] {
+  return nameTokens(tokenize(text));
+}
+
 /** A token that can name a street by itself: has a letter and is neither a via-type word nor a stopword. */
 const isAlphabetic = (token: string) => HAS_LETTER.test(token) && !isNoise(token);
 /** A token that names a street by itself: a word, or the decimal of a passage. */

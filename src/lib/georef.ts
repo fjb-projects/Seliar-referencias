@@ -49,6 +49,7 @@ interface GeorefRequestOptions {
 
 const HAS_NUMBER = /\d/;
 const INTERSECTION = /\S+\s+y\s+\S+/i;
+const DIGITS_ONLY = /^\d+$/;
 
 /**
  * Heuristic: true when the query looks like a street address, i.e. it contains
@@ -65,12 +66,15 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-/** Reads a house number the API may send as a number or as a numeric string. */
+/**
+ * Reads a house number the API may send as a number or as a string of digits.
+ * `Number()` would also take "0x10", "1e3" or "12.5", none of which is a house number.
+ */
 function toAltura(value: unknown): number | null {
   if (isFiniteNumber(value)) return value;
-  if (typeof value !== 'string' || value.trim() === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return DIGITS_ONLY.test(text) ? Number(text) : null;
 }
 
 function toHit(raw: unknown): GeorefHit | null {
@@ -115,10 +119,10 @@ function toStreet(raw: unknown): GeorefStreet | null {
   };
   if (typeof entry.nombre !== 'string') return null;
   const localidad = entry.localidad_censal?.nombre;
-  const starts = finiteSides(entry.altura?.inicio);
-  const ends = finiteSides(entry.altura?.fin);
-  let alturaMin = starts.length > 0 ? Math.min(...starts) : null;
-  let alturaMax = ends.length > 0 ? Math.max(...ends) : null;
+  // Both bounds read all four side values: a street digitised backwards has its start above its end.
+  const sides = [...finiteSides(entry.altura?.inicio), ...finiteSides(entry.altura?.fin)];
+  let alturaMin = sides.length > 0 ? Math.min(...sides) : null;
+  let alturaMax = sides.length > 0 ? Math.max(...sides) : null;
   // The API reports 0 on both ends when it has no range data for the street.
   if (alturaMin === 0 && alturaMax === 0) {
     alturaMin = null;

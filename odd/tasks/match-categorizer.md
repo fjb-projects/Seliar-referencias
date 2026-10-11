@@ -31,7 +31,7 @@ hierarchy, query Georef always (not only when the catalog is empty), and show th
 | 3 | Interpolated | Georef | `/direcciones` hit whose street grades >= strong and was not folded into a category 1 row. |
 | 4 | NeighbourBlock | catalog | Street grade >= strong AND block distance 100..200. |
 | 5 | SameStreet | catalog | Street grade >= strong AND (no query number, or block distance > 200, or record without block). |
-| 6 | StreetExists | Georef | `/calles` hit grading >= strong, for a locality with no category 3 row. Shows the height range. |
+| 6 | StreetExists | Georef | `/calles` hit grading >= strong, for a locality with no category 3 row and whose range can hold the typed number (out-of-range localities are dropped). Shows the height range. |
 | 7 | Similar | both | Street grade weak (either source), or non-confident engine hits. |
 
 Initial thresholds (to validate): neighbour = block distance <= 200; agreement = 300 m; typo tolerance for street-name
@@ -57,7 +57,7 @@ Not in scope: import scripts, `public/data`, fixing catalog typos (the owner kee
 - [x] T1b `src/lib/address.ts` + tests, data shapes found in the real catalog (user decision 2026-10-11: a decimal passage name such as "Pje 38.50" / "Pje 34,50" / "Pje 169.5" is the street NAME and must be read whole; 34 records): decimal token `d+[.,]d+` is one name token (comma == dot), never a block or house number; a via-type word or a decimal name counts as the name before a house number ("pje 38.50 1200" -> street [38.50], number 1200); double blocks "8300 / 8400" mean the record covers both blocks (`blocks: number[]`); an alias "A / B" with letters on both sides is two names. Route: delegated writer.
 - [x] T1c `src/lib/address.ts` + tests, from native review: R3-001 a query made only of single-letter tokens must grade `none` (an initial may only assist a match that also has a full-word token); R3-002 pin the current "san martin 2500 depto 3" behavior with a test. Plus the decimal-precision decision if the user takes it. Route: delegated writer.
 - [x] T2 `src/lib/georef.ts` + tests: `GeorefHit` gains `calle` and `altura`; new `searchGeorefStreets` (`/calles`, height ranges); never throws. Route: delegated writer.
-- [ ] T3 `src/lib/categorize.ts` + tests, and `src/lib/search.ts`: no fuzzy on tokens containing digits; pure `rankResults(...)` implementing the hierarchy, folding, discrepancy, caps and auto-select. Route: delegated writer.
+- [x] T3 `src/lib/categorize.ts` + tests, and `src/lib/search.ts`: no fuzzy on tokens containing digits; pure `rankResults(...)` implementing the hierarchy, folding, discrepancy, caps and auto-select. Route: delegated writer.
 - [ ] T4 UI: `App.tsx` queries Georef always (address -> `/direcciones` + `/calles` in parallel; name only -> `/calles`), new unified result list with category + source labels, both street names, stable-key pick; remove the superseded zero-hit-only `GeorefResults`; keep the Maps text-search fallback. Route: delegated writer.
 - [ ] T5 README + `reports/technical-decisions.md` + full checks + live probe against real data and the real API.
 
@@ -94,6 +94,10 @@ Skill registry `.atl/skill-registry.md`: not present. Engram mirror `odd/match-c
   Notes for T3: `GeorefHit.calle` is upper-case official name and must go through the address.ts tokenizer; `alturaMin/Max` can be null independently, both null when 0/0; `searchGeoref` param order changed (values identical).
 - Native review of slice 09a1c6a..81d845f (T1c + T2, 519 lines, medium): consent granted, reliability lens -> approved, acknowledged (authority burned). Reviewed boundary is now 81d845f.
   Advisory findings, both accepted into T3 because they are defects inside this feature: R3-001 src/lib/georef.ts:118-121 inverted range (inicio > fin) yields alturaMin > alturaMax -> take min/max over all four finite side values; R3-002 georef.ts:72 `Number()` accepts "0x10"/"1e3" as altura -> require digits only.
+- T3 done (delegated writer + parent refinement). RED observed per part; `npm test` 556/556, typecheck clean, build OK, lint only the 2 pre-existing warnings; gold set 38/38 unchanged. ~1,270 changed lines (mostly tests; not split, the categorizer is one unit).
+  Parent refinement after a live probe: `/calles` rows for localities whose range cannot hold the number were pure noise ("SAN MARTIN @ Recreo [0-1599]" for 8540) -> dropped before de-duplication; `outOfRange` field removed; 3 tests adjusted.
+  Live probe (real catalog + real Georef): "san martin 8540" -> ConfirmedBlock «Sobre San Martin 8500» +Georef at 12 m, autoSelect 0; "san martin 2500" -> Interpolated Santa Fe / Santo Tomé first, catalog 8500-8900 as SameStreet; "pje 32.50 8350" -> SameBlock «Pje 32,50 8300 / 8400»; "comisaria 25" -> single Reference row, autoSelect 0.
+  Behaviors to know: (a) Georef ranges are min/max over all four side values, so both bounds are null together or set together; (b) «Av Peñaloza 7700» loses auto-select because «MONOBLOCK 11» is also a confident engine hit (ambiguous -> no auto-select); (c) any trailing number puts the query in street mode ("comisaria 25", "torre 3" render through the unified list, results unchanged); (d) non-confident engine hits fill Similar with unrelated records ("San Jose 8500" for "san martin 8540"), candidate tuning: hide them when street rows exist.
 
 ## Next step
-T3.
+T4.

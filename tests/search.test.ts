@@ -82,6 +82,55 @@ describe('ranking', () => {
   });
 });
 
+describe('digits are never typo-tolerant', () => {
+  const nombres = (query: string, limit = 50) => engine.search(query, limit).hits.map((h) => h.ref.nombre);
+
+  it('"san martin 2500" does not reach "Sobre San Martin 8500" through a fuzzy number', () => {
+    const response = engine.search('san martin 2500', 50);
+    expect(response.hits.filter((h) => h.tier === Tier.Fuzzy)).toEqual([]);
+    // No record holds "2500" next to San Martin, so the record only shows as a flagged partial match.
+    const reached = response.hits.filter((h) => h.ref.nombre === 'Sobre San Martin 8500');
+    expect(reached.every((h) => h.tier === Tier.Partial)).toBe(true);
+    expect(response.partial).toBe(true);
+    expect(response.autoSelect).toBe(-1);
+    // The record itself is still found by its own block.
+    expect(nombres('san martin 8500')).toContain('Sobre San Martin 8500');
+  });
+
+  it('never matches a number one edit away, alone or swapped', () => {
+    for (const query of ['san martin 8050', 'san martin 8600', 'san martin 5800']) {
+      const response = engine.search(query, 50);
+      const reached = response.hits.filter((h) => h.ref.nombre === 'Sobre San Martin 8500');
+      // Reaching it at all is only allowed as a flagged partial match of the street words.
+      expect(reached.every((h) => h.tier === Tier.Partial), query).toBe(true);
+    }
+  });
+
+  it('keeps typo tolerance for the words next to a number', () => {
+    expect(nombres('san matrin 8500')).toContain('Sobre San Martin 8500');
+    expect(nombres('zavala 10300')).toContain('Sobre Zavalla 10300');
+  });
+
+  it('keeps "comisaria 25" on its exact record', () => {
+    const response = engine.search('comisaria 25');
+    expect(response.hits[0].ref.nombre).toBe('Comisaria 25');
+    expect(response.hits[0].tier).toBe(Tier.ExactName);
+    expect(response.autoSelect).toBe(0);
+  });
+
+  it('keeps "torre 3" on the exact towers', () => {
+    const response = engine.search('torre 3');
+    expect(response.hits[0].ref.nombre).toBe('Torre 3');
+    expect(response.hits[0].tier).toBe(Tier.ExactName);
+  });
+
+  it('still completes a number as a prefix while typing', () => {
+    const response = engine.search('torre 1', 200);
+    expect(response.hits.some((h) => h.ref.nombre === 'Torre 10')).toBe(true);
+    expect(response.hits.find((h) => h.ref.nombre === 'Torre 10')!.tier).toBeLessThan(Tier.Fuzzy);
+  });
+});
+
 describe('auto-selection never guesses', () => {
   it('selects the only strong match', () => {
     const r = engine.search('Escuela Santa Rita De Casia');

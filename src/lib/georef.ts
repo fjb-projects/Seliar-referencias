@@ -119,10 +119,14 @@ function toStreet(raw: unknown): GeorefStreet | null {
   };
   if (typeof entry.nombre !== 'string') return null;
   const localidad = entry.localidad_censal?.nombre;
-  // Both bounds read all four side values: a street digitised backwards has its start above its end.
-  const sides = [...finiteSides(entry.altura?.inicio), ...finiteSides(entry.altura?.fin)];
-  let alturaMin = sides.length > 0 ? Math.min(...sides) : null;
-  let alturaMax = sides.length > 0 ? Math.max(...sides) : null;
+  const inicio = finiteSides(entry.altura?.inicio);
+  const fin = finiteSides(entry.altura?.fin);
+  // With both ends known, each bound reads all four side values: a street digitised backwards has
+  // its start above its end. With one end missing, that bound stays unknown instead of being guessed.
+  const bothEnds = inicio.length > 0 && fin.length > 0;
+  const sides = [...inicio, ...fin];
+  let alturaMin = bothEnds ? Math.min(...sides) : inicio.length > 0 ? Math.min(...inicio) : null;
+  let alturaMax = bothEnds ? Math.max(...sides) : fin.length > 0 ? Math.max(...fin) : null;
   // The API reports 0 on both ends when it has no range data for the street.
   if (alturaMin === 0 && alturaMax === 0) {
     alturaMin = null;

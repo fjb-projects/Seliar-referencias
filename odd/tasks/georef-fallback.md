@@ -55,5 +55,12 @@ Strategy: ask-on-risk. Forecast ~350-450 authored changed lines; slice boundarie
   Design change vs plan: separate validator instead of widening `isSafeMapsUrl`, so coordinate links keep strict validation.
   `isSafeMapsUrl` has no callers outside maps.ts. Review assess: medium, under_budget (accumulated ~440 lines on branch).
 
+- Native review of T1+T2 slice (main..50ba6bd): medium risk, consent granted, 1 lens (reliability) -> approved, acknowledged
+  (lineage review-5204b13c71104d83, authority burned). Reviewed boundary is now 50ba6bd.
+  Non-blocking advisory findings (not yet accepted as scope):
+  - R3-001 tests/georef.test.ts:163-168: already-aborted-signal test does not assert `fetchImpl` was not called.
+  - R3-002 src/lib/georef.ts:52-56: untested branches (non-string nomenclatura dropped; empty localidad fallback).
+  - R3-003 src/lib/maps.ts:89-90: no test for control chars / whitespace-only `localidad` in buildMapsTextUrl.
+
 ## Next step
-T3.
+T3 (and, if the user accepts, a small test-hardening follow-up for R3-001..003).

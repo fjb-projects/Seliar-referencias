@@ -74,5 +74,10 @@ Strategy: ask-on-risk. Forecast ~350-450 authored changed lines; slice boundarie
   abort on query change, Enter without explicit pick never opens, local keyboard branch untouched).
   Deviation: ResultList.tsx untouched; new `GeorefResults.tsx` instead of editing it.
 
+- Native review of T2b+T3+T4 slice (50ba6bd..d931d1c): medium, consent granted, reliability lens -> approved, acknowledged (lineage review-07e1e6efc2ba6d3a, authority burned). Reviewed boundary is now d931d1c.
+  Non-blocking advisory findings (not yet accepted as scope):
+  - R3-001 src/App.tsx:57-58: `useGeoref` keeps its last result after being disabled; returning to a previously searched address shows the cached hits as `done` while a fresh request is also issued, and the newer answer can shift the list under an explicit ArrowDown pick. Untested.
+  - R3-002 src/App.tsx:142-146: ArrowUp / wrap-around in Georef mode has no test.
+
 ## Next step
 T5 (README + final full checks).

@@ -76,6 +76,7 @@ interface Scenario {
   engine?: SearchResponse;
   addresses?: GeorefHit[] | null;
   streets?: GeorefStreet[] | null;
+  pinnedKey?: string | null;
 }
 
 function inputFor(text: string, scenario: Scenario = {}): RankInput {
@@ -85,6 +86,7 @@ function inputFor(text: string, scenario: Scenario = {}): RankInput {
     streets: buildStreetIndex(scenario.refs ?? []),
     georefAddresses: scenario.addresses ?? null,
     georefStreets: scenario.streets ?? null,
+    pinnedKey: scenario.pinnedKey,
   };
 }
 
@@ -221,7 +223,6 @@ describe('catalog street rows', () => {
       [Category.NeighbourBlock, 'Sobre San Martin 8700'],
       [Category.SameStreet, 'Sobre San Martin 8800'],
       [Category.SameStreet, 'Sobre San Martin'],
-      [Category.Similar, 'Sobre San Martin Norte 8500'],
     ]);
     expect(output.items.map((item) => (item.source === 'catalog' ? item.blockDistance : 'georef'))).toEqual([
       0,
@@ -229,9 +230,8 @@ describe('catalog street rows', () => {
       200,
       300,
       null,
-      0,
     ]);
-    expect(output.items.map((item) => item.streetGrade)).toEqual(['exact', 'exact', 'exact', 'exact', 'exact', 'weak']);
+    expect(output.items.map((item) => item.streetGrade)).toEqual(['exact', 'exact', 'exact', 'exact', 'exact']);
   });
 
   it('puts every record of the street in SameStreet when the query has no number', () => {
@@ -243,7 +243,8 @@ describe('catalog street rows', () => {
       'Sobre San Martin 8800',
       'Sobre San Martin',
     ]);
-    expect(namesIn(output, Category.Similar)).toEqual(['Sobre San Martin Norte 8500']);
+    // The street that only resembles it is hidden: there are better rows.
+    expect(namesIn(output, Category.Similar)).toEqual([]);
     expect(output.items.every((item) => item.source !== 'catalog' || item.blockDistance === null)).toBe(true);
   });
 
@@ -297,22 +298,24 @@ describe('catalog street rows', () => {
 
 describe('Georef address rows', () => {
   it('ranks strong hits as Interpolated, weak ones as Similar and drops the rest', () => {
-    const output = rank('san martin 2500', {
-      addresses: [
-        hit('SAN MARTIN NORTE', 2500),
-        hit('BELGRANO', 2500),
-        hit('SAN MARTIN', 2500),
-        hit('GRAL J DE SAN MARTIN', 2500),
-        hit('', 2500, { label: 'sin calle' }),
-      ],
-    });
-    expect(rows(output)).toEqual([
-      [Category.Interpolated, 'SAN MARTIN 2500, La Capital, Santa Fe @ Santa Fe'],
+    const weak = [
+      hit('SAN MARTIN NORTE', 2500),
+      hit('BELGRANO', 2500),
+      hit('GRAL J DE SAN MARTIN', 2500),
+      hit('', 2500, { label: 'sin calle' }),
+    ];
+    const alone = rank('san martin 2500', { addresses: weak });
+    expect(rows(alone)).toEqual([
       [Category.Similar, 'SAN MARTIN NORTE 2500, La Capital, Santa Fe @ Santa Fe'],
       [Category.Similar, 'GRAL J DE SAN MARTIN 2500, La Capital, Santa Fe @ Santa Fe'],
     ]);
-    expect(output.items.map((item) => item.streetGrade)).toEqual(['exact', 'weak', 'weak']);
-    expect(output.items.every((item) => item.source === 'georef' && item.kind === 'address')).toBe(true);
+    expect(alone.items.map((item) => item.streetGrade)).toEqual(['weak', 'weak']);
+    expect(alone.items.every((item) => item.source === 'georef' && item.kind === 'address')).toBe(true);
+
+    // With the street itself resolved, the ones that only resemble it are hidden.
+    const output = rank('san martin 2500', { addresses: [weak[0], weak[1], hit('SAN MARTIN', 2500), weak[2], weak[3]] });
+    expect(rows(output)).toEqual([[Category.Interpolated, 'SAN MARTIN 2500, La Capital, Santa Fe @ Santa Fe']]);
+    expect(output.items.map((item) => item.streetGrade)).toEqual(['exact']);
   });
 
   it('grades the official name with the catalog tokenizer (decimals, via words)', () => {
@@ -414,10 +417,7 @@ describe('folding a Georef hit into a SameBlock row', () => {
       refs: [block],
       addresses: [hit('BELGRANO', 8540), hit('SAN MARTIN NORTE', 8540)],
     });
-    expect(rows(output)).toEqual([
-      [Category.SameBlock, 'Sobre San Martin 8500'],
-      [Category.Similar, 'SAN MARTIN NORTE 8540, La Capital, Santa Fe @ Santa Fe'],
-    ]);
+    expect(rows(output)).toEqual([[Category.SameBlock, 'Sobre San Martin 8500']]);
     expect(catalogRow(output, 'Sobre San Martin 8500')).not.toHaveProperty('discrepancy');
   });
 
@@ -478,10 +478,7 @@ describe('Georef street rows', () => {
     });
     // Recreo only has a weak address, which is no evidence for the street.
     expect(namesIn(output, Category.StreetExists)).toEqual(['SAN MARTIN @ Santa Fe', 'SAN MARTIN @ Recreo']);
-    expect(namesIn(output, Category.Similar)).toEqual([
-      'SAN MARTIN NORTE 2500, La Capital, Santa Fe @ Recreo',
-      'SAN MARTIN SUR @ Candioti',
-    ]);
+    expect(namesIn(output, Category.Similar)).toEqual([]);
     expect(output.items.some((item) => nameOf(item).startsWith('BELGRANO'))).toBe(false);
   });
 
@@ -567,10 +564,9 @@ describe('engine hits', () => {
         [club, Tier.Fuzzy],
       ]),
     });
-    expect(rows(output)).toEqual([
-      [Category.Reference, 'Plaza San Martin'],
-      [Category.Similar, 'Club San Martin'],
-    ]);
+    expect(rows(output)).toEqual([[Category.Reference, 'Plaza San Martin']]);
+    const alone = rank('san martin 8540', { engine: engineOf([[club, Tier.Fuzzy]]) });
+    expect(rows(alone)).toEqual([[Category.Similar, 'Club San Martin']]);
   });
 
   it('ranks every hit of a partial answer as Similar', () => {
@@ -601,9 +597,12 @@ describe('engine hits', () => {
     expect(rows(output)).toEqual([
       [Category.Reference, 'Plaza San Martin'],
       [Category.SameBlock, 'Sobre San Martin 8500'],
-      [Category.Similar, 'Sobre San Martin Norte 8500'],
     ]);
     expect(catalogRow(output, 'Sobre San Martin 8500').streetGrade).toBe('exact');
+    // The weak street is a street row too, not an engine reference, when it is the only thing left.
+    const weakOnly = rank('san martin 8540', { refs: [weakStreet], engine: engineOf([[weakStreet, Tier.AllWords]]) });
+    expect(weakOnly.items).toHaveLength(1);
+    expect(weakOnly.items[0]).toMatchObject({ category: Category.Similar, streetGrade: 'weak', key: 'c:sobre-san-martin-norte-8500' });
   });
 
   it('keeps a street record the query does not name as an ordinary engine hit', () => {
@@ -628,7 +627,8 @@ describe('ordering and caps', () => {
       addresses: [hit('SAN MARTIN', 8540), hit('SAN MARTIN', 8540, { localidad: 'Recreo', ...north(30_000) })],
       streets: [georefStreet('SAN MARTIN', 'Candioti'), georefStreet('SAN MARTIN', 'Recreo')],
     });
-    expect(output.items.map((item) => item.category)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    // The Similar street ("San Martin Norte") is hidden behind the better rows.
+    expect(output.items.map((item) => item.category)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(output.items.map((item) => item.key)).toEqual([
       'c:plaza-san-martin',
       'c:confirmed',
@@ -637,7 +637,6 @@ describe('ordering and caps', () => {
       'c:sobre-san-martin-8600',
       'c:sobre-san-martin-9900',
       's:Candioti|SAN MARTIN',
-      'c:sobre-san-martin-norte-100',
     ]);
   });
 
@@ -704,7 +703,7 @@ describe('ordering and caps', () => {
     ]);
   });
 
-  it('orders Similar rows: catalog in engine order, then Georef addresses, then Georef streets', () => {
+  it('orders Similar rows: weak catalog streets, Georef addresses, Georef streets, then engine hits', () => {
     const unranked = calle('Sobre San Martin Sur 100');
     const ranked = calle('Sobre San Martin Norte 100');
     const club = makeRef('Club San Martn');
@@ -718,11 +717,12 @@ describe('ordering and caps', () => {
       streets: [georefStreet('SAN MARTIN OESTE')],
     });
     expect(rows(output)).toEqual([
-      [Category.Similar, 'Club San Martn'],
+      // The weak street the engine ranked goes before the one it did not return.
       [Category.Similar, 'Sobre San Martin Norte 100'],
       [Category.Similar, 'Sobre San Martin Sur 100'],
       [Category.Similar, 'SAN MARTIN NORTE 8540, La Capital, Santa Fe @ Santa Fe'],
       [Category.Similar, 'SAN MARTIN OESTE @ Santa Fe'],
+      [Category.Similar, 'Club San Martn'],
     ]);
   });
 
@@ -785,6 +785,82 @@ describe('ordering and caps', () => {
     expect(namesIn(output, Category.Reference)).toHaveLength(12);
     expect(namesIn(output, Category.SameBlock)).toHaveLength(12);
     expect(namesIn(output, Category.Interpolated)).toHaveLength(12);
+  });
+});
+
+describe('Similar visibility', () => {
+  const weakStreet = calle('Sobre San Martin Norte 100');
+  const club = makeRef('Club San Martn');
+  const fuzzy = engineOf([[club, Tier.Fuzzy]]);
+  const weakAddress = hit('SAN MARTIN NORTE', 8540);
+  const weakGeorefStreet = georefStreet('SAN MARTIN OESTE');
+  const everySimilar = { refs: [weakStreet], engine: fuzzy, addresses: [weakAddress], streets: [weakGeorefStreet] };
+  const similarKeys = [
+    'c:sobre-san-martin-norte-100',
+    'g:Santa Fe|SAN MARTIN NORTE 8540, La Capital, Santa Fe',
+    's:Santa Fe|SAN MARTIN OESTE',
+    'c:club-san-martn',
+  ];
+
+  it('shows Similar rows when there is nothing better', () => {
+    const output = rank('san martin 8540', everySimilar);
+    expect(output.streetMode).toBe(true);
+    expect(output.items.map((item) => [item.category, item.key])).toEqual(similarKeys.map((key) => [Category.Similar, key]));
+    expect(output.autoSelect).toBe(-1);
+  });
+
+  it.each<[string, Scenario, number]>([
+    ['Reference', { engine: engineOf([[makeRef('Plaza San Martin'), Tier.AllWords], [club, Tier.Fuzzy]]) }, Category.Reference],
+    ['ConfirmedBlock', { refs: [weakStreet, calle('Sobre San Martin 8500')], addresses: [weakAddress, hit('SAN MARTIN', 8540)] }, Category.ConfirmedBlock],
+    ['SameBlock', { refs: [weakStreet, calle('Sobre San Martin 8500')] }, Category.SameBlock],
+    ['Interpolated', { addresses: [weakAddress, hit('SAN MARTIN', 8540)] }, Category.Interpolated],
+    ['NeighbourBlock', { refs: [weakStreet, calle('Sobre San Martin 8600')] }, Category.NeighbourBlock],
+    ['SameStreet', { refs: [weakStreet, calle('Sobre San Martin 100')] }, Category.SameStreet],
+    ['StreetExists', { streets: [weakGeorefStreet, georefStreet('SAN MARTIN')] }, Category.StreetExists],
+  ])('hides every Similar row behind a single %s row', (_label, better, category) => {
+    const output = rank('san martin 8540', { ...everySimilar, ...better });
+    expect(output.items.map((item) => item.category)).toEqual([category]);
+  });
+
+  it.each(similarKeys)('keeps the pinned Similar row %s after the better rows', (pinnedKey) => {
+    const output = rank('san martin 8540', {
+      ...everySimilar,
+      refs: [weakStreet, calle('Sobre San Martin 8500')],
+      streets: [weakGeorefStreet, georefStreet('SAN MARTIN', 'Recreo')],
+      pinnedKey,
+    });
+    expect(output.items.map((item) => [item.category, item.key])).toEqual([
+      [Category.SameBlock, 'c:sobre-san-martin-8500'],
+      [Category.StreetExists, 's:Recreo|SAN MARTIN'],
+      [Category.Similar, pinnedKey],
+    ]);
+    expect(output.autoSelect).toBe(0);
+  });
+
+  it('ignores a pinned key that is not a Similar row, or names no row', () => {
+    const scenario = { ...everySimilar, refs: [weakStreet, calle('Sobre San Martin 8500')] };
+    const plain = rows(rank('san martin 8540', scenario));
+    expect(plain).toEqual([[Category.SameBlock, 'Sobre San Martin 8500']]);
+    for (const pinnedKey of ['c:sobre-san-martin-8500', 'c:gone', '', null]) {
+      expect(rows(rank('san martin 8540', { ...scenario, pinnedKey }))).toEqual(plain);
+    }
+    // With nothing better, pinning changes neither the rows nor their order.
+    expect(rank('san martin 8540', { ...everySimilar, pinnedKey: similarKeys[2] })).toEqual(rank('san martin 8540', everySimilar));
+  });
+
+  it('keeps a pinned row the cap would drop, in its place, without taking the slot of another', () => {
+    const refs = ['Norte', 'Sur', 'Este', 'Oeste', 'Viejo', 'Nuevo', 'Chico'].map((side) => calle(`Sobre San Martin ${side} 100`));
+    const keysOf = (pinnedKey?: string) => rank('san martin 8540', { refs, pinnedKey }).items.map((item) => item.key);
+    const capped = ['norte', 'sur', 'este', 'oeste', 'viejo'].map((side) => `c:sobre-san-martin-${side}-100`);
+    expect(keysOf()).toEqual(capped);
+    expect(keysOf('c:sobre-san-martin-chico-100')).toEqual([...capped, 'c:sobre-san-martin-chico-100']);
+    // A pinned row inside the cap leaves the list as it was.
+    expect(keysOf('c:sobre-san-martin-sur-100')).toEqual(capped);
+  });
+
+  it('does not let Similar rows turn street mode on', () => {
+    const output = rank('san', { ...everySimilar, pinnedKey: similarKeys[0] });
+    expect(output).toEqual({ streetMode: false, items: [], autoSelect: -1 });
   });
 });
 
@@ -907,12 +983,25 @@ describe('auto-select', () => {
     const output = rank('san martin 8540', {
       refs: [block],
       engine: engineOf([[makeRef('Club San Martn'), Tier.Fuzzy]]),
+      addresses: [hit('SAN MARTIN', 8540, { ...north(4000), localidad: 'Recreo' }), hit('SAN MARTIN', 8540)],
     });
+    // The Similar engine hit is hidden and the block row is not the first one confirmed away.
     expect(rows(output)).toEqual([
-      [Category.SameBlock, 'Sobre San Martin 8500'],
-      [Category.Similar, 'Club San Martn'],
+      [Category.ConfirmedBlock, 'Sobre San Martin 8500'],
+      [Category.Interpolated, 'SAN MARTIN 8540, La Capital, Santa Fe @ Recreo'],
     ]);
     expect(output.autoSelect).toBe(0);
+    const pinned = rank('san martin 8540', {
+      refs: [calle('Sobre San Martin 8600'), block],
+      engine: engineOf([[makeRef('Club San Martn'), Tier.Fuzzy]]),
+      pinnedKey: 'c:club-san-martn',
+    });
+    expect(rows(pinned)).toEqual([
+      [Category.SameBlock, 'Sobre San Martin 8500'],
+      [Category.NeighbourBlock, 'Sobre San Martin 8600'],
+      [Category.Similar, 'Club San Martn'],
+    ]);
+    expect(pinned.autoSelect).toBe(0);
   });
 
   it('selects nothing when a Reference row rivals the block row', () => {

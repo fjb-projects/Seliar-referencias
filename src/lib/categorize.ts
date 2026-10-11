@@ -98,6 +98,8 @@ export interface RankInput {
   /** Null while Georef has not answered, or when it was not asked. */
   georefAddresses: GeorefHit[] | null;
   georefStreets: GeorefStreet[] | null;
+  /** Key of the row the operator picked: if it is a Similar row it stays, whatever else shows up. */
+  pinnedKey?: string | null;
 }
 
 export interface RankOutput {
@@ -311,6 +313,15 @@ function lowestBlocks(streets: StreetIndexEntry[]): Map<string, number> {
 }
 
 /**
+ * The Similar rows worth showing, from all of them in order. They are a last resort: any better
+ * row hides them, and otherwise only the first few are kept. The row the operator picked is the
+ * exception to both, so it never vanishes under the cursor.
+ */
+function visibleSimilar(similar: RankedItem[], hasBetter: boolean, pinnedKey: string | null): RankedItem[] {
+  return similar.filter((row, index) => row.key === pinnedKey || (!hasBetter && index < SIMILAR_CAP));
+}
+
+/**
  * The row Enter picks without asking: the engine's own unambiguous reference when no block row
  * competes, or the single block row when no reference competes. Never a Georef row.
  */
@@ -369,7 +380,7 @@ export function rankResults(input: RankInput): RankOutput {
       ? byBlockDistance(a, b)
       : compareNullsLast(lowest.get(a.ref.id) ?? null, lowest.get(b.ref.id) ?? null);
 
-  const items: RankedItem[] = [
+  const better: RankedItem[] = [
     // Only engine rows are references, and they are already in engine order.
     ...inCategory(Category.Reference),
     ...inCategory(Category.ConfirmedBlock).sort(
@@ -385,12 +396,17 @@ export function rankResults(input: RankInput): RankOutput {
       georefStreets.filter((row) => row.category === Category.StreetExists),
       (row) => row.street.localidad,
     ).slice(0, STREET_EXISTS_CAP),
-    ...[
-      ...inEngineOrder(inCategory(Category.Similar), engine),
-      ...addressRows.filter((row) => row.category === Category.Similar),
-      ...georefStreets.filter((row) => row.category === Category.Similar),
-    ].slice(0, SIMILAR_CAP),
   ];
+
+  const isSimilar = (row: RankedItem) => row.category === Category.Similar;
+  // Streets that resemble the one typed come before the engine hits that are merely not confident.
+  const similar: RankedItem[] = [
+    ...inEngineOrder(streetRows.filter(isSimilar), engine),
+    ...addressRows.filter(isSimilar),
+    ...georefStreets.filter(isSimilar),
+    ...fromEngine.filter(isSimilar),
+  ];
+  const items = [...better, ...visibleSimilar(similar, better.length > 0, input.pinnedKey ?? null)];
 
   return { streetMode: true, items, autoSelect: autoSelectIndex(items, engine) };
 }

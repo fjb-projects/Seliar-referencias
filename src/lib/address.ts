@@ -154,11 +154,16 @@ function connectorIndex(tokens: string[]): number {
   );
 }
 
-/**
- * Splits what the operator typed into street, house number and crossing street.
- * "san martin 2500 esq garay" -> street [san, martin], number 2500, cross [garay].
- */
-export function parseAddressQuery(text: string): ParsedQuery {
+/** What the operator typed, cut into its parts; every word is still there, noise included. */
+interface QueryParts {
+  /** Tokens of the main street as typed, without the house number. */
+  street: string[];
+  number: number | null;
+  /** Tokens after the connector of an intersection, or null. */
+  cross: string[] | null;
+}
+
+function splitQuery(text: string): QueryParts {
   let tokens = tokenize(text);
 
   // "rivadavia entre mitre y belgrano": the bounding streets do not name the main one.
@@ -166,17 +171,34 @@ export function parseAddressQuery(text: string): ParsedQuery {
   const between = tokens.indexOf(BETWEEN);
   if (between > 0 && tokens.slice(0, between).some(namesStreet)) tokens = tokens.slice(0, between);
 
-  let crossTokens: string[] | null = null;
+  let cross: string[] | null = null;
   const connector = connectorIndex(tokens);
   if (connector !== -1) {
-    crossTokens = nameTokens(tokens.slice(connector + 1));
+    cross = tokens.slice(connector + 1);
     tokens = tokens.slice(0, connector);
   }
 
   const numberAt = houseNumberIndex(tokens);
   const number = numberAt === -1 ? null : Number(tokens[numberAt]);
-  const streetTokens = nameTokens(tokens.filter((_, i) => i !== numberAt));
-  return { streetTokens, number, crossTokens };
+  return { street: tokens.filter((_, i) => i !== numberAt), number, cross };
+}
+
+/**
+ * Splits what the operator typed into street, house number and crossing street.
+ * "san martin 2500 esq garay" -> street [san, martin], number 2500, cross [garay].
+ */
+export function parseAddressQuery(text: string): ParsedQuery {
+  const { street, number, cross } = splitQuery(text);
+  return { streetTokens: nameTokens(street), number, crossTokens: cross === null ? null : nameTokens(cross) };
+}
+
+/**
+ * The main street as typed, normalised but with every word kept, and without the house number
+ * or the crossing street: "Av. 9 de Julio 2500 y Salta" -> "av 9 de julio". It is the text a
+ * street-name lookup needs, where "9 de julio" must not be reduced to "9 julio".
+ */
+export function streetQueryText(text: string): string {
+  return splitQuery(text).street.join(' ');
 }
 
 /** Blocks of the given numbers, ascending and without repeats. */

@@ -10,6 +10,7 @@ import {
   parseAddressQuery,
   parseCatalogStreet,
   streetNameTokens,
+  streetQueryText,
   type ParsedQuery,
   type StreetGrade,
 } from '../src/lib/address';
@@ -61,6 +62,33 @@ describe('streetNameTokens', () => {
     expect(gradeStreetName(parseAddressQuery('san martin 2500').streetTokens, streetNameTokens('SAN MARTIN'))).toBe(
       'exact',
     );
+  });
+});
+
+describe('streetQueryText', () => {
+  it.each([
+    ['San Martín 2500', 'san martin'],
+    ['9 de julio 2500', '9 de julio'],
+    ['av. freyre 1500', 'av freyre'],
+    ['san martin y juan de garay', 'san martin'],
+    ['pje 38,50 1200', 'pje 38.5'],
+    ['', ''],
+    ['   ', ''],
+    ['san martin', 'san martin'],
+    ['25 de mayo', '25 de mayo'],
+    ['Bv. Gálvez 1500 esq. Güemes', 'bv galvez'],
+    ['rivadavia entre mitre y belgrano', 'rivadavia'],
+    ['Entre Ríos 300', 'entre rios'],
+    ['calle 12', 'calle 12'],
+    ['sobre  la  rioja', 'sobre la rioja'],
+  ])('"%s" -> "%s"', (text, expected) => {
+    expect(streetQueryText(text)).toBe(expected);
+  });
+
+  it('keeps the words the parsed street tokens drop, and drops the same number', () => {
+    const text = 'Av. 9 de Julio 2500';
+    expect(streetQueryText(text)).toBe('av 9 de julio');
+    expect(parseAddressQuery(text)).toEqual({ streetTokens: ['9', 'julio'], number: 2500, crossTokens: null });
   });
 });
 

@@ -83,6 +83,7 @@ Strategy: ask-on-risk. Forecast ~350-450 authored changed lines; slice boundarie
 - T5 done (inline: one documentation file, no research needed). README: new "Direcciones aproximadas (Georef)" section, fixed the now-false claims ("sin solicitudes HTTP por consulta", "176 tests"), structure line updated.
   Final checks: `npm test` 261/261, typecheck clean, build OK, lint only the 2 pre-existing warnings. Live check of `searchGeoref` against the real API (tsx): san martin 2500 -> 3 localities (262 ms), belgrano 1000 -> 3, libertad 500 -> 0, comisaria -> no call. Same results as the curl probes.
   Not verified: real-browser behavior (CORS verified only with curl headers; UI only through jsdom tests).
+- Post-T5 (user request): console.log tracing of Georef activity in `useGeoref` (querying / result count+ms / discarded) and a `skipped` log with the reason when a no-hit query is not address-shaped. Cause of the report: a street name without number or " y " never triggers Georef by design (`looksLikeAddress`). App tests 29/29, typecheck clean, lint only the 2 pre-existing warnings. No test added for console output (diagnostic only).
 
 ## Next step
 User decisions: push / PR (not done), slice strategy for delivery, and the open questions below.

@@ -46,8 +46,15 @@ function useGeoref(query: string, enabled: boolean): GeorefState {
     if (!enabled) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
+      const started = performance.now();
+      console.log(`[georef] querying «${query}»`);
       void searchGeoref(query, controller.signal).then((hits) => {
-        if (!controller.signal.aborted) setResult({ query, hits });
+        if (controller.signal.aborted) {
+          console.log(`[georef] discarded «${query}» (query changed or aborted)`);
+          return;
+        }
+        console.log(`[georef] «${query}» -> ${hits.length} hit(s) in ${Math.round(performance.now() - started)} ms`, hits);
+        setResult({ query, hits });
       });
     }, GEOREF_DEBOUNCE_MS);
     return () => {
@@ -82,6 +89,11 @@ export default function App() {
   // Georef only runs when the local engine found nothing for an address-shaped query.
   const georefEnabled = catalog.status === 'ready' && total === 0 && looksLikeAddress(trimmed);
   const georef = useGeoref(trimmed, georefEnabled);
+  useEffect(() => {
+    if (catalog.status === 'ready' && trimmed !== '' && total === 0 && !georefEnabled) {
+      console.log(`[georef] skipped «${trimmed}»: not address-shaped (needs a number or "street y street")`);
+    }
+  }, [catalog.status, trimmed, total, georefEnabled]);
   const georefHits = georef.status === 'done' ? georef.hits : [];
   // Separate from `picked`: Georef results are never auto-selected.
   const [geoPicked, setGeoPicked] = useState<number | null>(null);

@@ -9,8 +9,8 @@ import { buildDirectionsUrl, buildMapsTextUrl, buildMapsUrl } from '../src/lib/m
 afterEach(cleanup);
 
 const HITS: GeorefHit[] = [
-  { label: 'SAN MARTIN 1234, SANTA FE', localidad: 'Santa Fe', latitude: -31.6, longitude: -60.7 },
-  { label: 'SAN MARTIN 1234, RECREO', localidad: 'Recreo', latitude: -31.5, longitude: -60.75 },
+  { label: 'SAN MARTIN 1234, SANTA FE', localidad: 'Santa Fe', latitude: -31.6, longitude: -60.7, calle: 'SAN MARTIN', altura: 1234 },
+  { label: 'SAN MARTIN 1234, RECREO', localidad: 'Recreo', latitude: -31.5, longitude: -60.75, calle: 'SAN MARTIN', altura: 1234 },
 ];
 
 function renderResults(hits: GeorefHit[], query = 'san martin 1234', activeIndex = -1, onHover = vi.fn()) {
@@ -66,7 +66,7 @@ describe('GeorefResults', () => {
   });
 
   it('shows the disabled text instead of links when coordinates are unusable', () => {
-    renderResults([{ label: 'X 1', localidad: 'Santa Fe', latitude: 999, longitude: 0 }]);
+    renderResults([{ label: 'X 1', localidad: 'Santa Fe', latitude: 999, longitude: 0, calle: 'X', altura: 1 }]);
     expect(screen.getByText('Sin coordenadas válidas')).toHaveClass('maps-link', 'is-disabled');
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });

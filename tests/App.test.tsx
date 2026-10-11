@@ -196,8 +196,8 @@ ${MALVINA_URL}`);
 describe('App georef fallback', () => {
   const ADDRESS = 'xqzv 98765';
   const HITS: GeorefHit[] = [
-    { label: 'XQZV 98765, SANTA FE', localidad: 'Santa Fe', latitude: -31.6, longitude: -60.7 },
-    { label: 'XQZV 98765, RECREO', localidad: 'Recreo', latitude: -31.5, longitude: -60.75 },
+    { label: 'XQZV 98765, SANTA FE', localidad: 'Santa Fe', latitude: -31.6, longitude: -60.7, calle: 'XQZV', altura: 98765 },
+    { label: 'XQZV 98765, RECREO', localidad: 'Recreo', latitude: -31.5, longitude: -60.75, calle: 'XQZV', altura: 98765 },
   ];
   const geoCalled = () => geoMock.mock.calls.length;
 

@@ -92,6 +92,8 @@ Skill registry `.atl/skill-registry.md`: not present. Engram mirror `odd/match-c
   Consequences to know: (a) the 6 "Pje S/N <block>" records have only the name [s, n] and can no longer be matched by street name (all-single-letter rule); (b) the 21 records with a one-letter alias "c" no longer match the query "c"; (c) `gradeStreetName` does not canonicalize its inputs, so Georef street names in T2/T3 MUST go through the address.ts tokenizer.
 - T2 done (delegated writer). RED observed (50 failed), georef tests 78/78, `npm test` 445/445, typecheck clean, lint only the 2 pre-existing warnings. Parent spot check: 78/78 + live API probe: `searchGeoref` returns calle+altura ("SAN MARTIN 2500 @ Santa Fe"); `searchGeorefStreets("rivadavia")` returns 6 localities with ranges (Santa Fe 0-9699) while `/direcciones` "rivadavia 1500" has no Santa Fe hit; "san matrin" -> SAN MARTIN (fuzzy); nonsense -> 0.
   Notes for T3: `GeorefHit.calle` is upper-case official name and must go through the address.ts tokenizer; `alturaMin/Max` can be null independently, both null when 0/0; `searchGeoref` param order changed (values identical).
+- Native review of slice 09a1c6a..81d845f (T1c + T2, 519 lines, medium): consent granted, reliability lens -> approved, acknowledged (authority burned). Reviewed boundary is now 81d845f.
+  Advisory findings, both accepted into T3 because they are defects inside this feature: R3-001 src/lib/georef.ts:118-121 inverted range (inicio > fin) yields alturaMin > alturaMax -> take min/max over all four finite side values; R3-002 georef.ts:72 `Number()` accepts "0x10"/"1e3" as altura -> require digits only.
 
 ## Next step
 T3.

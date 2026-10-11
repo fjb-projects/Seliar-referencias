@@ -144,6 +144,15 @@ describe('buildMapsTextUrl', () => {
     },
   );
 
+  it('returns null when the localidad contains a control character', () => {
+    expect(buildMapsTextUrl('Ruta 11', 'Santo\u0000 Tomé')).toBeNull();
+    expect(buildMapsTextUrl('Ruta 11', 'Santo\nTomé')).toBeNull();
+  });
+
+  it('omits a whitespace-only localidad from the query', () => {
+    expect(buildMapsTextUrl('Ruta 11', '   ')).toBe(buildMapsTextUrl('Ruta 11'));
+  });
+
   it('accepts text of exactly 200 characters', () => {
     expect(buildMapsTextUrl('a'.repeat(200))).not.toBeNull();
   });

@@ -31,6 +31,7 @@ Excluded by the user: Colonia San José.
 ## Tasks
 - [x] T1 `src/lib/georef.ts` + `tests/georef.test.ts`: locality list, `looksLikeAddress`, `searchGeoref` (timeout, abort, mapping, errors). Route: delegated writer (2 non-trivial files).
 - [x] T2 `maps.ts`: `buildMapsTextUrl` + separate `isSafeMapsTextUrl` (`isSafeMapsUrl` intentionally left strict/coordinate-only); tests in `tests/maps.test.ts`.
+- [x] T2b Test hardening from native review R3-001..003 (tests only, no source changes): assert `fetchImpl` not called on already-aborted signal; cover non-string `nomenclatura` drop and empty-`localidad` fallback; cover control-char and whitespace-only `localidad` in `buildMapsTextUrl`. Files: `tests/georef.test.ts`, `tests/maps.test.ts`.
 - [ ] T3 `App.tsx`: georef state machine (idle|loading|ok|empty|error), debounce, only when local hits are empty and query looks like an address; no auto-select.
 - [ ] T4 `ResultList.tsx` (or sibling component) + CSS: Georef block with label, locality, fallback link; component tests.
 - [ ] T5 README section + final `typecheck`, `lint`, `test`, `build`.
@@ -62,5 +63,9 @@ Strategy: ask-on-risk. Forecast ~350-450 authored changed lines; slice boundarie
   - R3-002 src/lib/georef.ts:52-56: untested branches (non-string nomenclatura dropped; empty localidad fallback).
   - R3-003 src/lib/maps.ts:89-90: no test for control chars / whitespace-only `localidad` in buildMapsTextUrl.
 
+- T2b done (delegated writer, tests only; user accepted R3-001..003 as scope). Mutation check: removing the aborted-signal
+  early return made the new assertion fail (1 failed, 30 passed), line restored, `git diff -- src` empty. georef+maps tests 94/94,
+  `npm test` 239/239, typecheck clean, lint only the 2 pre-existing warnings. Parent spot check: 94/94, src untouched.
+
 ## Next step
-T3 (and, if the user accepts, a small test-hardening follow-up for R3-001..003).
+T3.

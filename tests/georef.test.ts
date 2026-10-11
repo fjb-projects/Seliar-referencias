@@ -165,5 +165,32 @@ describe('searchGeoref', () => {
     const controller = new AbortController();
     controller.abort();
     expect(await searchGeoref('x 1', controller.signal, { fetchImpl })).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('drops entries whose nomenclatura is not a string and keeps the valid ones', async () => {
+    const body = {
+      direcciones: [
+        { nomenclatura: 42, localidad_censal: { nombre: 'X' }, ubicacion: { lat: -31, lon: -60 } },
+        { localidad_censal: { nombre: 'X' }, ubicacion: { lat: -31, lon: -60 } },
+        { nomenclatura: 'OK', localidad_censal: { nombre: 'X' }, ubicacion: { lat: -31.5, lon: -60.5 } },
+      ],
+    };
+    const hits = await searchGeoref('x 1', undefined, { fetchImpl: mockFetch(jsonResponse(body)) });
+    expect(hits.map((h) => h.label)).toEqual(['OK']);
+  });
+
+  it('keeps entries with a missing localidad_censal or a non-string nombre, using an empty localidad', async () => {
+    const body = {
+      direcciones: [
+        { nomenclatura: 'A', ubicacion: { lat: -31, lon: -60 } },
+        { nomenclatura: 'B', localidad_censal: { nombre: 7 }, ubicacion: { lat: -31, lon: -60 } },
+      ],
+    };
+    const hits = await searchGeoref('x 1', undefined, { fetchImpl: mockFetch(jsonResponse(body)) });
+    expect(hits.map((h) => [h.label, h.localidad])).toEqual([
+      ['A', ''],
+      ['B', ''],
+    ]);
   });
 });

@@ -1,13 +1,17 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
+import { GeorefResults } from './components/GeorefResults';
 import { ResultList, optionId } from './components/ResultList';
 import { loadCatalog } from './lib/catalog';
-import { buildMapsUrlFor } from './lib/maps';
+import { looksLikeAddress, searchGeoref } from './lib/georef';
+import type { GeorefHit } from './lib/georef';
+import { buildMapsUrl, buildMapsUrlFor } from './lib/maps';
 import { SearchEngine } from './lib/search';
 import { shareReference } from './lib/share';
 import type { Reference } from './lib/types';
 
 const MAX_RESULTS = 10;
+const GEOREF_DEBOUNCE_MS = 400;
 
 type CatalogState =
   | { status: 'loading' }
@@ -29,6 +33,32 @@ function useEngine(): CatalogState {
   return state;
 }
 
+type GeorefState = { status: 'idle' } | { status: 'loading' } | { status: 'done'; hits: GeorefHit[] };
+
+/**
+ * Looks the query up in Georef, debounced, only while `enabled`. The request is
+ * aborted when the query changes or the component unmounts, and stale answers
+ * are ignored. `searchGeoref` never throws: failure and empty both mean `done` with no hits.
+ */
+function useGeoref(query: string, enabled: boolean): GeorefState {
+  const [result, setResult] = useState<{ query: string; hits: GeorefHit[] } | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void searchGeoref(query, controller.signal).then((hits) => {
+        if (!controller.signal.aborted) setResult({ query, hits });
+      });
+    }, GEOREF_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query, enabled]);
+  if (!enabled) return { status: 'idle' };
+  return result?.query === query ? { status: 'done', hits: result.hits } : { status: 'loading' };
+}
+
 export default function App() {
   const catalog = useEngine();
   const [query, setQuery] = useState('');
@@ -44,6 +74,17 @@ export default function App() {
   );
   const hits = response?.hits ?? [];
   const activeIndex = picked !== null && picked < hits.length ? picked : (response?.autoSelect ?? -1);
+
+  const trimmed = query.trim();
+  const total = hits.length;
+  // Georef only runs when the local engine found nothing for an address-shaped query.
+  const georefEnabled = catalog.status === 'ready' && total === 0 && looksLikeAddress(trimmed);
+  const georef = useGeoref(trimmed, georefEnabled);
+  const georefHits = georef.status === 'done' ? georef.hits : [];
+  // Separate from `picked`: Georef results are never auto-selected.
+  const [geoPicked, setGeoPicked] = useState<number | null>(null);
+  const geoActive = geoPicked !== null && geoPicked < georefHits.length ? geoPicked : -1;
+  const geoMode = georefHits.length > 0;
 
   // Ctrl+K from anywhere focuses the search box.
   useEffect(() => {
@@ -61,7 +102,18 @@ export default function App() {
   const changeQuery = (value: string) => {
     setQuery(value);
     setPicked(null);
+    setGeoPicked(null);
     setNotice(null);
+  };
+
+  const openGeoref = () => {
+    if (geoActive < 0) {
+      setNotice('Elegí una dirección aproximada con ↑ ↓ y Enter.');
+      return;
+    }
+    const hit = georefHits[geoActive];
+    const url = buildMapsUrl(hit.latitude, hit.longitude);
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const openActive = () => {
@@ -81,6 +133,30 @@ export default function App() {
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (geoMode) {
+      const n = georefHits.length;
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setGeoPicked(geoActive < 0 ? 0 : (geoActive + 1) % n);
+          setNotice(null);
+          return;
+        case 'ArrowUp':
+          e.preventDefault();
+          setGeoPicked(geoActive <= 0 ? n - 1 : geoActive - 1);
+          setNotice(null);
+          return;
+        case 'Enter':
+          e.preventDefault();
+          openGeoref();
+          return;
+        case 'Escape':
+          e.preventDefault();
+          if (geoPicked !== null) setGeoPicked(null);
+          else changeQuery('');
+          return;
+      }
+    }
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
@@ -104,9 +180,6 @@ export default function App() {
     }
   };
 
-  const trimmed = query.trim();
-  const total = hits.length;
-
   return (
     <main className="app">
       <h1 className="title">Buscador de referencias</h1>
@@ -120,9 +193,17 @@ export default function App() {
           placeholder="Escribí un lugar, calle o barrio…  (Ctrl+K)"
           aria-label="Buscar referencia"
           role="combobox"
-          aria-expanded={total > 0}
+          aria-expanded={total > 0 || geoMode}
           aria-controls={listId}
-          aria-activedescendant={activeIndex >= 0 ? optionId(listId, activeIndex) : undefined}
+          aria-activedescendant={
+            geoMode
+              ? geoActive >= 0
+                ? optionId(listId, geoActive)
+                : undefined
+              : activeIndex >= 0
+                ? optionId(listId, activeIndex)
+                : undefined
+          }
           aria-autocomplete="list"
           autoComplete="off"
           spellCheck={false}
@@ -142,7 +223,8 @@ export default function App() {
         {catalog.status === 'ready' &&
           trimmed === '' &&
           'Empezá a escribir para buscar. ↑ ↓ para recorrer, Enter para abrir en Google Maps, Esc para limpiar.'}
-        {catalog.status === 'ready' && trimmed !== '' && total === 0 && `Sin coincidencias para «${trimmed}».`}
+        {georef.status === 'loading' && 'Buscando dirección aproximada…'}
+        {catalog.status === 'ready' && trimmed !== '' && total === 0 && !georefEnabled && `Sin coincidencias para «${trimmed}».`}
         {response?.partial && total > 0 && 'No hay resultados con todas las palabras: se muestran coincidencias parciales.'}
         {notice ??
           (!response?.partial && total > 1 && activeIndex < 0
@@ -150,6 +232,9 @@ export default function App() {
             : null)}
       </div>
 
+      {georef.status === 'done' && (
+        <GeorefResults hits={georefHits} query={trimmed} activeIndex={geoActive} listId={listId} onHover={setGeoPicked} />
+      )}
       {total > 0 && <ResultList hits={hits} activeIndex={activeIndex} listId={listId} onHover={setPicked} onShare={share} />}
     </main>
   );

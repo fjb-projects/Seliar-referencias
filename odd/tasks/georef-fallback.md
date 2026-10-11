@@ -32,8 +32,9 @@ Excluded by the user: Colonia San José.
 - [x] T1 `src/lib/georef.ts` + `tests/georef.test.ts`: locality list, `looksLikeAddress`, `searchGeoref` (timeout, abort, mapping, errors). Route: delegated writer (2 non-trivial files).
 - [x] T2 `maps.ts`: `buildMapsTextUrl` + separate `isSafeMapsTextUrl` (`isSafeMapsUrl` intentionally left strict/coordinate-only); tests in `tests/maps.test.ts`.
 - [x] T2b Test hardening from native review R3-001..003 (tests only, no source changes): assert `fetchImpl` not called on already-aborted signal; cover non-string `nomenclatura` drop and empty-`localidad` fallback; cover control-char and whitespace-only `localidad` in `buildMapsTextUrl`. Files: `tests/georef.test.ts`, `tests/maps.test.ts`.
-- [ ] T3 `App.tsx`: georef state machine (idle|loading|ok|empty|error), debounce, only when local hits are empty and query looks like an address; no auto-select.
-- [ ] T4 `ResultList.tsx` (or sibling component) + CSS: Georef block with label, locality, fallback link; component tests.
+- NOTE: T3 and T4 are delegated to ONE writer (state and rendering are tightly coupled). New component file `src/components/GeorefResults.tsx` (keeps `ResultList.tsx` untouched). Georef state simplified to idle|loading|done(hits) because `searchGeoref` cannot distinguish error from empty (both -> `[]` -> fallback link). Keyboard: with no local hits, ↑↓ move between Georef hits, Enter opens only an explicitly picked one.
+- [x] T3 `App.tsx`: georef state machine (idle|loading|ok|empty|error), debounce, only when local hits are empty and query looks like an address; no auto-select.
+- [x] T4 `ResultList.tsx` (or sibling component) + CSS: Georef block with label, locality, fallback link; component tests.
 - [ ] T5 README section + final `typecheck`, `lint`, `test`, `build`.
 
 ## Acceptance criteria
@@ -67,5 +68,11 @@ Strategy: ask-on-risk. Forecast ~350-450 authored changed lines; slice boundarie
   early return made the new assertion fail (1 failed, 30 passed), line restored, `git diff -- src` empty. georef+maps tests 94/94,
   `npm test` 239/239, typecheck clean, lint only the 2 pre-existing warnings. Parent spot check: 94/94, src untouched.
 
+- T3+T4 done (one delegated writer; trigger: 5 files, state/render coupled). RED observed (component module missing; 8/10 new App tests failed),
+  App+GeorefResults tests 33/33, `npm test` 257/257, typecheck clean, build OK, lint only the 2 pre-existing warnings,
+  `git diff -- src/lib src/components/ResultList.tsx` empty. Parent spot check: 33/33 + diff read (Georef gated on zero local hits,
+  abort on query change, Enter without explicit pick never opens, local keyboard branch untouched).
+  Deviation: ResultList.tsx untouched; new `GeorefResults.tsx` instead of editing it.
+
 ## Next step
-T3.
+T5 (README + final full checks).

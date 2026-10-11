@@ -362,7 +362,12 @@ export function rankResults(input: RankInput): RankOutput {
     streetRows.some((row) => row.category !== Category.Similar) ||
     interpolated.length > 0 ||
     georefStreets.some((row) => row.category === Category.StreetExists);
-  if (query.number === null && query.crossTokens === null && !namesAStreet) {
+  // Without a confident engine hit, streets that merely resemble the one typed are the best there
+  // is to show ("grierson" for Georef's "DRA CECILIA GRIERSON"): they are listed as Similar rows.
+  const hasConfidentHit = !engine.partial && engine.hits.some((hit) => hit.tier <= Tier.AllPrefixes);
+  const onlyResemblances =
+    !hasConfidentHit && (streetRows.length > 0 || addressRows.length > 0 || georefStreets.length > 0);
+  if (query.number === null && query.crossTokens === null && !namesAStreet && !onlyResemblances) {
     return { streetMode: false, items: [], autoSelect: -1 };
   }
 

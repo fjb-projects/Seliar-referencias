@@ -47,7 +47,8 @@ Cuando la búsqueda es una calle o una dirección, la lista deja de ser la lista
 La lista categorizada se usa cuando se cumple alguna de estas condiciones:
 
 - el texto tiene una altura (`san martin 2500`) o es una intersección (`san martin y juan de garay`, también con `esquina` o `esq`);
-- el texto, sin altura, es el nombre de una calle que el catálogo o Georef reconocen (`san martin`).
+- el texto, sin altura, es el nombre de una calle que el catálogo o Georef reconocen (`san martin`);
+- el motor no encontró ninguna coincidencia confiable y hay calles cuyo nombre se parece al texto (`grierson`, que Georef conoce como «DRA CECILIA GRIERSON»). En ese caso todas las filas son «Parecido».
 
 En cualquier otro caso (`utn`, `comisaria`, un barrio) se mantiene la lista simple, con el mismo orden y la misma selección automática de siempre. Un nombre seguido de un número (`comisaria 25`, `torre 3`) se lee como una altura y se muestra en la lista categorizada, pero los resultados son los mismos: aparecen en la categoría «Referencia».
 

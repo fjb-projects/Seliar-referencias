@@ -162,13 +162,50 @@ describe('street mode', () => {
     expect(rank('plaza gran malvina', { refs, engine, addresses: [], streets: [] })).toEqual(off);
   });
 
-  it('is off when streets only match weakly', () => {
+  it('is off when streets only match weakly and the engine has a confident hit', () => {
     const output = rank('san', {
       refs,
+      engine: engineOf([[refs[0], Tier.AllPrefixes]]),
       addresses: [hit('SAN MARTIN NORTE', 100)],
       streets: [georefStreet('SAN MARTIN'), georefStreet('BELGRANO')],
     });
     expect(output).toEqual(off);
+  });
+
+  it('is on when streets only match weakly and the engine only has partial or fuzzy hits', () => {
+    // Real case: "cecilia grierson" gets partial engine hits that must not hide Georef's street.
+    const streets = [georefStreet('DRA CECILIA GRIERSON', 'Santa Fe', 0, 8999)];
+    const partial = rank('cecilia grierson', {
+      refs,
+      engine: engineOf([[refs[0], Tier.Partial]], { partial: true }),
+      streets,
+    });
+    expect(rows(partial)).toEqual([
+      [Category.Similar, 'DRA CECILIA GRIERSON @ Santa Fe'],
+      [Category.Similar, 'Plaza Gran Malvina'],
+    ]);
+    const fuzzy = rank('cecilia grierson', { refs, engine: engineOf([[refs[0], Tier.Fuzzy]]), streets });
+    expect(fuzzy.streetMode).toBe(true);
+    expect(rows(fuzzy)[0]).toEqual([Category.Similar, 'DRA CECILIA GRIERSON @ Santa Fe']);
+  });
+
+  it('is on when streets only match weakly and the engine found nothing: they are all there is', () => {
+    // Real case: "grierson" is not in the catalog and Georef knows the street as "DRA CECILIA GRIERSON".
+    const output = rank('grierson', { refs, streets: [georefStreet('DRA CECILIA GRIERSON', 'Santa Fe', 0, 8999)] });
+    expect(output.streetMode).toBe(true);
+    expect(rows(output)).toEqual([[Category.Similar, 'DRA CECILIA GRIERSON @ Santa Fe']]);
+    expect(output.autoSelect).toBe(-1);
+  });
+
+  it('is on for a weak catalog street when the engine found nothing', () => {
+    const output = rank('martin', { refs });
+    expect(output.streetMode).toBe(true);
+    expect(rows(output)).toEqual([[Category.Similar, 'Sobre San Martin 8500']]);
+  });
+
+  it('stays off when nothing resembles a street and the engine found nothing', () => {
+    expect(rank('grierson', { refs, streets: [georefStreet('BELGRANO')] })).toEqual(off);
+    expect(rank('grierson', { refs, streets: [] })).toEqual(off);
   });
 
   it('is off for an empty query', () => {
@@ -858,9 +895,18 @@ describe('Similar visibility', () => {
     expect(keysOf('c:sobre-san-martin-sur-100')).toEqual(capped);
   });
 
-  it('does not let Similar rows turn street mode on', () => {
-    const output = rank('san', { ...everySimilar, pinnedKey: similarKeys[0] });
+  it('does not let Similar rows turn street mode on while the engine has a confident hit', () => {
+    const engine = engineOf([[makeRef('Plaza San'), Tier.NamePrefix]]);
+    const output = rank('san', { ...everySimilar, engine, pinnedKey: similarKeys[0] });
     expect(output).toEqual({ streetMode: false, items: [], autoSelect: -1 });
+  });
+
+  it('lets Similar rows turn street mode on when the engine has no confident hit', () => {
+    const output = rank('san', everySimilar);
+    expect(output.streetMode).toBe(true);
+    expect(output.items.length).toBeGreaterThan(0);
+    expect(output.items.every((item) => item.category === Category.Similar)).toBe(true);
+    expect(output.autoSelect).toBe(-1);
   });
 });
 

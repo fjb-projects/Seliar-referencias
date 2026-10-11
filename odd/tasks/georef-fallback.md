@@ -30,7 +30,7 @@ Excluded by the user: Colonia San José.
 
 ## Tasks
 - [x] T1 `src/lib/georef.ts` + `tests/georef.test.ts`: locality list, `looksLikeAddress`, `searchGeoref` (timeout, abort, mapping, errors). Route: delegated writer (2 non-trivial files).
-- [ ] T2 `maps.ts`: text-search fallback URL builder + extend `isSafeMapsUrl`; tests in `tests/maps.test.ts`.
+- [x] T2 `maps.ts`: `buildMapsTextUrl` + separate `isSafeMapsTextUrl` (`isSafeMapsUrl` intentionally left strict/coordinate-only); tests in `tests/maps.test.ts`.
 - [ ] T3 `App.tsx`: georef state machine (idle|loading|ok|empty|error), debounce, only when local hits are empty and query looks like an address; no auto-select.
 - [ ] T4 `ResultList.tsx` (or sibling component) + CSS: Georef block with label, locality, fallback link; component tests.
 - [ ] T5 README section + final `typecheck`, `lint`, `test`, `build`.
@@ -50,5 +50,10 @@ Strategy: ask-on-risk. Forecast ~350-450 authored changed lines; slice boundarie
   Extra: `looksLikeAddress` needs >=3 chars and `\S+ y \S+`; already-aborted signal returns [] without fetching.
   Commit: see `git log` (feat(georef): add address lookup restricted to La Capital localities).
 
+- T2 done (delegated writer, 2 files). RED observed, maps tests 61/61, `npm test` 235/235, typecheck clean, lint only the 2
+  pre-existing warnings (parent replaced the control-char regex with `hasControlChars` to avoid a new no-control-regex warning).
+  Design change vs plan: separate validator instead of widening `isSafeMapsUrl`, so coordinate links keep strict validation.
+  `isSafeMapsUrl` has no callers outside maps.ts. Review assess: medium, under_budget (accumulated ~440 lines on branch).
+
 ## Next step
-T2.
+T3.

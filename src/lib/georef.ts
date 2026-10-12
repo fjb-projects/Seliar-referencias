@@ -1,6 +1,9 @@
-const GEOREF_URL = 'https://apis.datos.gob.ar/georef/api/direcciones';
+const GEOREF_API = 'https://apis.datos.gob.ar/georef/api';
+const GEOREF_URL = `${GEOREF_API}/direcciones`;
+const GEOREF_STREETS_URL = `${GEOREF_API}/calles`;
 const PROVINCIA_SANTA_FE = '82';
 const MAX_RESULTS = 5;
+const MAX_STREETS = 20;
 const DEFAULT_TIMEOUT_MS = 1500;
 
 /** Censal localities (all in La Capital, Santa Fe) the Georef lookup is restricted to: id -> name. */
@@ -22,10 +25,31 @@ export interface GeorefHit {
   localidad: string;
   latitude: number;
   longitude: number;
+  /** Official street name (`calle.nombre`), e.g. "SAN MARTIN"; empty when the API omits it. */
+  calle: string;
+  /** House number Georef resolved (`altura.valor`); null when missing or non-numeric. */
+  altura: number | null;
+}
+
+/** A street known to Georef in one locality, with the house-number range it covers. */
+export interface GeorefStreet {
+  nombre: string;
+  localidad: string;
+  /** Lowest house number of the street; null, together with `alturaMax`, when the range is not known. */
+  alturaMin: number | null;
+  /** Highest house number of the street; null, together with `alturaMin`, when the range is not known. */
+  alturaMax: number | null;
+}
+
+/** Options shared by the Georef lookups. */
+interface GeorefRequestOptions {
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
 }
 
 const HAS_NUMBER = /\d/;
 const INTERSECTION = /\S+\s+y\s+\S+/i;
+const DIGITS_ONLY = /^\d+$/;
 
 /**
  * Heuristic: true when the query looks like a street address, i.e. it contains
@@ -38,10 +62,27 @@ export function looksLikeAddress(query: string): boolean {
   return HAS_NUMBER.test(text) || INTERSECTION.test(text);
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/**
+ * Reads a house number the API may send as a number or as a string of digits.
+ * `Number()` would also take "0x10", "1e3" or "12.5", none of which is a house number.
+ */
+function toAltura(value: unknown): number | null {
+  if (isFiniteNumber(value)) return value;
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return DIGITS_ONLY.test(text) ? Number(text) : null;
+}
+
 function toHit(raw: unknown): GeorefHit | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const entry = raw as {
     nomenclatura?: unknown;
+    calle?: { nombre?: unknown } | null;
+    altura?: { valor?: unknown } | null;
     localidad_censal?: { nombre?: unknown } | null;
     ubicacion?: { lat?: unknown; lon?: unknown } | null;
   };
@@ -51,12 +92,98 @@ function toHit(raw: unknown): GeorefHit | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   if (typeof entry.nomenclatura !== 'string') return null;
   const nombre = entry.localidad_censal?.nombre;
+  const calle = entry.calle?.nombre;
   return {
     label: entry.nomenclatura,
     localidad: typeof nombre === 'string' ? nombre : '',
     latitude: lat,
     longitude: lon,
+    calle: typeof calle === 'string' ? calle : '',
+    altura: toAltura(entry.altura?.valor),
   };
+}
+
+type StreetSides = { derecha?: unknown; izquierda?: unknown } | null | undefined;
+
+/** The finite house numbers of one end of a street (its right and left sides). */
+function finiteSides(sides: StreetSides): number[] {
+  return [sides?.derecha, sides?.izquierda].filter(isFiniteNumber);
+}
+
+function toStreet(raw: unknown): GeorefStreet | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const entry = raw as {
+    nombre?: unknown;
+    localidad_censal?: { nombre?: unknown } | null;
+    altura?: { inicio?: StreetSides; fin?: StreetSides } | null;
+  };
+  if (typeof entry.nombre !== 'string') return null;
+  const localidad = entry.localidad_censal?.nombre;
+  const inicio = finiteSides(entry.altura?.inicio);
+  const fin = finiteSides(entry.altura?.fin);
+  // With both ends known, each bound reads all four side values: a street digitised backwards has
+  // its start above its end. With one end missing nobody knows which way the street runs, so the
+  // known end could be either bound: the whole range stays unknown instead of being guessed.
+  const bothEnds = inicio.length > 0 && fin.length > 0;
+  const sides = [...inicio, ...fin];
+  let alturaMin = bothEnds ? Math.min(...sides) : null;
+  let alturaMax = bothEnds ? Math.max(...sides) : null;
+  // The API reports 0 on both ends when it has no range data for the street.
+  if (alturaMin === 0 && alturaMax === 0) {
+    alturaMin = null;
+    alturaMax = null;
+  }
+  return {
+    nombre: entry.nombre,
+    localidad: typeof localidad === 'string' ? localidad : '',
+    alturaMin,
+    alturaMax,
+  };
+}
+
+/**
+ * GETs a Georef endpoint with the fixed province/locality filters and returns
+ * the parsed JSON body. Never throws: an already-aborted signal (no request is
+ * made), network errors, non-2xx responses, malformed JSON, timeouts and aborts
+ * (by the caller's signal or the timeout) all resolve to `undefined`.
+ */
+async function requestGeoref(
+  endpoint: string,
+  params: Record<string, string>,
+  signal: AbortSignal | undefined,
+  opts: GeorefRequestOptions,
+): Promise<unknown> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch } = opts;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (signal?.aborted) return undefined;
+  signal?.addEventListener('abort', abort, { once: true });
+  const timer = setTimeout(abort, timeoutMs);
+
+  try {
+    const url = new URL(endpoint);
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+    url.searchParams.set('provincia', PROVINCIA_SANTA_FE);
+    url.searchParams.set('localidad_censal', Object.keys(GEOREF_LOCALIDADES).join(','));
+
+    const response = await fetchImpl(url.toString(), { signal: controller.signal });
+    if (!response.ok) return undefined;
+    const body: unknown = await response.json();
+    return body;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
+  }
+}
+
+/** Maps the array stored under `key` in a response body, skipping the entries `map` rejects. */
+function mapList<T>(body: unknown, key: string, map: (raw: unknown) => T | null): T[] {
+  if (typeof body !== 'object' || body === null) return [];
+  const list = (body as Record<string, unknown>)[key];
+  if (!Array.isArray(list)) return [];
+  return list.map(map).filter((item): item is T => item !== null);
 }
 
 /**
@@ -67,32 +194,24 @@ function toHit(raw: unknown): GeorefHit | null {
 export async function searchGeoref(
   text: string,
   signal?: AbortSignal,
-  opts: { timeoutMs?: number; fetchImpl?: typeof fetch } = {},
+  opts: GeorefRequestOptions = {},
 ): Promise<GeorefHit[]> {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl = fetch } = opts;
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  if (signal?.aborted) return [];
-  signal?.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(abort, timeoutMs);
+  const body = await requestGeoref(GEOREF_URL, { direccion: text, max: String(MAX_RESULTS) }, signal, opts);
+  return mapList(body, 'direcciones', toHit);
+}
 
-  try {
-    const url = new URL(GEOREF_URL);
-    url.searchParams.set('direccion', text);
-    url.searchParams.set('provincia', PROVINCIA_SANTA_FE);
-    url.searchParams.set('localidad_censal', Object.keys(GEOREF_LOCALIDADES).join(','));
-    url.searchParams.set('max', String(MAX_RESULTS));
-
-    const response = await fetchImpl(url.toString(), { signal: controller.signal });
-    if (!response.ok) return [];
-    const body: unknown = await response.json();
-    const list = (body as { direcciones?: unknown } | null)?.direcciones;
-    if (!Array.isArray(list)) return [];
-    return list.map(toHit).filter((hit): hit is GeorefHit => hit !== null);
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener('abort', abort);
-  }
+/**
+ * Looks a street name up in the Georef API (`/calles`), restricted to the
+ * allowed localities; one entry per locality the street exists in, with its
+ * house-number range. An empty name resolves to an empty array without a
+ * request. Never throws: same contract as `searchGeoref`.
+ */
+export async function searchGeorefStreets(
+  name: string,
+  signal?: AbortSignal,
+  opts: GeorefRequestOptions = {},
+): Promise<GeorefStreet[]> {
+  if (name.trim() === '') return [];
+  const body = await requestGeoref(GEOREF_STREETS_URL, { nombre: name, max: String(MAX_STREETS) }, signal, opts);
+  return mapList(body, 'calles', toStreet);
 }

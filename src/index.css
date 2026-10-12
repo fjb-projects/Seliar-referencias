@@ -192,33 +192,64 @@ body {
   border-color: var(--border);
 }
 
-/* Approximate (Georef) addresses: a dashed, accent-tinted look keeps them apart from verified references. */
-.badge.georef-badge {
+/* Ranked (street) results: rows are grouped by category, and each one says how far it can be trusted. */
+.result-group {
+  padding: 6px 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.badge.category-badge {
+  text-transform: none;
+}
+
+/* A catalog record: verified by the people who loaded it. */
+.badge.category-badge.is-verified {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+/* A Georef estimate: the dashed, accent-tinted look keeps it apart from verified references. */
+.badge.category-badge.is-georef {
   color: var(--accent);
   background: var(--accent-soft);
   border-style: dashed;
   border-color: var(--accent);
-  text-transform: none;
 }
 
-.georef-localidad {
+/* Only resembles what was typed. */
+.badge.category-badge.is-similar {
+  border-style: dotted;
+}
+
+.badge.source-badge {
+  text-transform: none;
+  border-color: transparent;
+  background: var(--bg);
+}
+
+.result-locality {
   font-size: 0.95rem;
   font-weight: 600;
 }
 
-.georef-empty {
-  padding: 14px 16px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  background: var(--surface);
+.result-warning {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--danger);
 }
 
-.georef-empty p {
-  margin: 0 0 10px;
-  color: var(--muted);
+/* Last resort when nothing matched: look the typed text up in Google Maps. */
+.maps-fallback {
+  margin: 0 2px 14px;
 }
 
-.georef-empty .maps-link {
+.maps-fallback .maps-link {
   display: inline-block;
   white-space: normal;
 }

@@ -1,6 +1,6 @@
 # Buscador de referencias
 
-Buscador instantáneo de referencias georreferenciadas para radiooperadores. Se escribe un lugar, calle o barrio, se identifica la coincidencia correcta y se abre su ubicación exacta en Google Maps. Todo corre en el navegador: sin backend y sin servicios pagos. Las referencias se buscan localmente, sin solicitudes HTTP; sólo cuando no hay ninguna coincidencia y el texto parece una dirección se consulta la API pública Georef (ver [Direcciones aproximadas](#direcciones-aproximadas-georef)).
+Buscador instantáneo de referencias georreferenciadas para radiooperadores. Se escribe un lugar, calle o barrio, se identifica la coincidencia correcta y se abre su ubicación exacta en Google Maps. Todo corre en el navegador: sin backend y sin servicios pagos. El catálogo propio se busca localmente, en memoria. Además, cuando el texto tiene forma de calle o dirección, se consulta en paralelo la API pública Georef y sus respuestas se ordenan junto con las del catálogo en una sola lista categorizada (ver [Calles y direcciones](#calles-y-direcciones-categorías-y-georef)).
 
 > **Aviso de privacidad.** Los datos se sirven como archivo estático (`public/data/references.json`) y **no tienen control de acceso**. Si las referencias son internas, no publiques la app sin autenticación. Este proyecto no hace ningún despliegue.
 
@@ -22,13 +22,13 @@ Abre `http://localhost:5173`. El campo de búsqueda tiene el foco al entrar.
 | --- | --- |
 | Escribir | Busca mientras se escribe |
 | ↑ / ↓ | Recorre los resultados |
-| Enter | Abre en Google Maps el resultado seleccionado |
-| Esc | Quita la selección; otra vez, limpia la búsqueda |
+| Enter | Abre en Google Maps el resultado seleccionado. Si no hay ninguno seleccionado, no abre nada y pide elegir uno |
+| Esc | Quita la selección hecha por el operador; otra vez, limpia la búsqueda |
 | Ctrl + K | Enfoca el buscador desde cualquier lugar |
 
-Si hay varias coincidencias posibles (por ejemplo `UTN` existe en dos barrios), **no se selecciona ninguna**: se elige con ↑ ↓. Con una única coincidencia clara, Enter la abre directamente.
+Si hay varias coincidencias posibles (por ejemplo `UTN` existe en dos barrios), **no se selecciona ninguna**: se elige con ↑ ↓. Con una única coincidencia clara, Enter la abre directamente. En las búsquedas de calles y direcciones la regla es más estricta (ver [Teclado y selección automática](#teclado-y-selección-automática)).
 
-Cada resultado ofrece tres acciones, todas basadas únicamente en las coordenadas guardadas:
+Cada resultado del catálogo ofrece tres acciones, todas basadas únicamente en las coordenadas guardadas (los resultados que aporta Georef ofrecen menos; ver [Categorías](#categorías)):
 
 | Acción | Qué hace |
 | --- | --- |
@@ -38,16 +38,103 @@ Cada resultado ofrece tres acciones, todas basadas únicamente en las coordenada
 
 > El menú de compartir y la geolocalización del celular sólo funcionan con la app servida por **HTTPS** (en `localhost` también). Probar el menú real de compartir requiere un teléfono.
 
-## Direcciones aproximadas (Georef)
+## Calles y direcciones: categorías y Georef
 
-Cuando el catálogo propio **no encuentra nada** y el texto parece una dirección (tiene un número, como `san martin 2500`, o dos calles unidas por " y ", como `san martin y juan de garay`), el buscador consulta [Georef](https://www.argentina.gob.ar/georef/api), la API oficial y gratuita de normalización de direcciones. Si el catálogo tiene al menos una coincidencia, Georef **no se consulta**.
+Cuando la búsqueda es una calle o una dirección, la lista deja de ser la lista simple del motor y pasa a ser una **lista categorizada**: los registros del catálogo y las respuestas de [Georef](https://www.argentina.gob.ar/georef/api) (la API oficial y gratuita de normalización de direcciones) se ordenan juntos, de mejor a peor, y cada fila indica su categoría y su fuente.
 
-- **Siempre aproximado.** Cada resultado lleva la etiqueta **«Dirección aproximada · Georef»** y la localidad. La coordenada se interpola por altura: puede quedar una o dos cuadras corrida y no es una referencia verificada.
-- **Nunca se selecciona solo.** Aunque haya un único resultado, se elige con ↑ ↓ y Enter. Si se aprieta Enter sin elegir, no se abre nada. La misma calle y altura puede existir en varias localidades.
-- **Respaldo.** Si Georef no responde (tiempo máximo 1,5 s), falla o no encuentra la dirección, se ofrece un enlace de Google Maps que busca por texto.
+### Cuándo cambia la lista
+
+La lista categorizada se usa cuando se cumple alguna de estas condiciones:
+
+- el texto tiene una altura (`san martin 2500`) o es una intersección (`san martin y juan de garay`, también con `esquina` o `esq`);
+- el texto, sin altura, es el nombre de una calle que el catálogo o Georef reconocen, completo (`san martin`) o por sus últimas palabras (`grierson`, que Georef conoce como «DRA CECILIA GRIERSON»);
+- el motor no encontró ninguna coincidencia confiable y hay calles cuyo nombre sólo se parece al texto (`griers`, un apellido a medio escribir). En ese caso todas las filas son «Parecido».
+
+En cualquier otro caso (`utn`, `comisaria`, un barrio) se mantiene la lista simple, con el mismo orden y la misma selección automática de siempre. Un nombre seguido de un número (`comisaria 25`, `torre 3`) se lee como una altura y se muestra en la lista categorizada, pero los resultados son los mismos: aparecen en la categoría «Referencia».
+
+### Consulta a Georef
+
+- **Siempre se consulta**, encuentre lo que encuentre el catálogo, cuando el texto tiene forma de calle: al menos una palabra de tres letras o el decimal de un pasaje (`38.50`). Esto incluye búsquedas de lugares, para las que Georef normalmente no devuelve nada útil.
+- **Dos recursos.** `/calles` se consulta siempre, con el nombre de la calle sin la altura ni la calle que cruza; devuelve en qué localidades existe la calle y su rango de alturas. `/direcciones` se consulta sólo si hay altura o intersección, con el texto completo; devuelve un punto interpolado. Las dos consultas salen en paralelo.
+- **Sin esperas.** Las filas del catálogo se muestran al instante; las de Georef se suman cuando llega la respuesta (mientras tanto, la lista categorizada indica «Buscando en Georef…»). La consulta sale 400 ms después de la última tecla y cada solicitud tiene un tiempo máximo de 1,5 s. Si Georef falla o no responde, se sigue sólo con el catálogo.
 - **Zona acotada.** La consulta se limita a estas localidades del departamento La Capital (Santa Fe), definidas en `src/lib/georef.ts` (`GEOREF_LOCALIDADES`, por código de localidad censal INDEC): Santa Fe, Recreo, Monte Vera, Candioti, Angel Gallardo, San José del Rincón, Arroyo Leyes, Santo Tomé y Sauce Viejo. Para sumar o quitar una ciudad se edita esa lista.
-- **Llamada directa desde el navegador.** La API responde con CORS abierto (`Access-Control-Allow-Origin: *`). No requiere clave, pero el servicio público no garantiza disponibilidad; por eso el respaldo es obligatorio. Si la central llegara a depender de Georef, conviene pasar por una función propia (con caché) o instalar la API en un servidor.
-- **Límites conocidos.** Georef no conoce barrios ni lugares: sólo calles y alturas. Algunas calles tienen huecos de datos y pueden dar cero resultados aunque existan (`bv pellegrini`, `av. 7 jefes`).
+- **Llamada directa desde el navegador.** La API responde con CORS abierto (`Access-Control-Allow-Origin: *`) y no requiere clave. Si la central llegara a depender de Georef, conviene pasar por una función propia (con caché) o instalar la API en un servidor.
+- **Respaldo.** Si no hay ninguna fila para mostrar y no queda ninguna respuesta pendiente, se ofrece un enlace de Google Maps que busca el texto escrito.
+
+### Categorías
+
+Las filas se ordenan por categoría, de mejor a peor, con dos excepciones. Una calle que coincide sólo por el final de su nombre («Crucero Belgrano» para `belgrano`) va después de todas las filas de la calle escrita, cualquiera sea su categoría, salvo que Georef la haya confirmado por distancia. Y una «Referencia» que el motor había ordenado después de un registro de la calle escrita (por ejemplo, «Alsina 9800» para `san martin`, que coincide por un alias) queda después de las filas de esa calle, y no se abre sola con Enter. Cada fila muestra dos etiquetas: la categoría y la fuente (`Catálogo`, `Georef` o `Catálogo + Georef`).
+
+| # | Etiqueta | Fuente | Qué significa |
+| --- | --- | --- | --- |
+| 0 | **Referencia** | Catálogo | Registro que el motor de búsqueda encontró con confianza (lugar, torre, barrio…). Es el resultado de siempre. |
+| 1 | **Cuadra confirmada** | Catálogo + Georef | Registro de la calle en la misma cuadra que la altura escrita, y Georef ubica la dirección a 300 m o menos. La fila indica la distancia («Georef coincide a N m»); el punto de Georef no tiene fila propia. |
+| 2 | **Misma cuadra** | Catálogo | Registro de la calle en la misma cuadra que la altura escrita, sin confirmación de Georef. |
+| 3 | **Dirección interpolada** | Georef | Punto que Georef calculó por altura sobre la calle escrita. Puede estar corrido una o dos cuadras; no es una referencia verificada. |
+| 4 | **Cuadra vecina** | Catálogo | Registro de la calle a una o dos cuadras de la altura escrita. La fila indica a cuántas. |
+| 5 | **Misma calle** | Catálogo | Registro de la calle a más de dos cuadras, sin cuadra para comparar, o búsqueda sin altura. Se muestran hasta 8, primero los más cercanos (sin altura, de menor a mayor). |
+| 6 | **La calle existe** | Georef | Georef conoce la calle en esa localidad, pero no ubicó la dirección allí. Muestra el rango de alturas cuando se conoce y sólo ofrece buscar por texto en Google Maps. Hasta 5 filas. |
+| 7 | **Parecido** | Catálogo o Georef | El nombre sólo se parece al escrito, o es una coincidencia del motor sin confianza. Hasta 5 filas. |
+
+Dentro de cada categoría de calles van primero las filas cuyo nombre coincide mejor (ver «Cómo se compara el nombre de la calle») y después vale el orden propio de la categoría; en las filas de Georef, ese orden pone primero las de la ciudad de Santa Fe. Las filas del catálogo conservan sus tres acciones; una «Dirección interpolada» ofrece abrir el punto y cómo llegar, y «La calle existe» sólo la búsqueda por texto.
+
+### Cómo se compara la altura
+
+- **Por cuadra (centena), nunca por número exacto.** Cada registro de calle del catálogo (`Sobre San Martin 8500`) marca la cuadra entera, del 8500 al 8599. `san martin 8540` cae en esa cuadra; `san martin 2500` no.
+- **Nunca con tolerancia a errores.** Un número no se corrige ni se completa: `2500` no coincide con `8500`. Lo mismo vale para el motor de búsqueda, que no aplica tolerancia a las palabras que tienen dígitos.
+- **Cuadras dobles.** Un registro escrito `Pje 32,50 8300 / 8400` cubre las dos cuadras.
+- **La altura es el último número del texto** (de 1 a 5 dígitos), siempre que antes haya un nombre de calle. `25 de mayo` no tiene altura.
+
+### Cómo se compara el nombre de la calle
+
+- **Dos nombres por registro.** Se compara contra el nombre popular y contra el nombre con el que figura en Google Maps (alias); la fila muestra ambos. Un alias con dos nombres separados por barra (`Luciano Leiva / Bernardo de Irigoyen`) cuenta como dos.
+- **Palabras que no cuentan.** Se ignoran las que indican el tipo de vía (`sobre`, `calle`, `av`, `avda`, `avenida`, `bv`, `boulevard`, `pje`, `pasaje`, `cjon`, `callejon`) y las palabras vacías (`de`, `del`, `la`, `el`, `los`, `las`, `y`, `en`, `por`, `al`), además de mayúsculas y tildes.
+- **Títulos que no cuentan.** También se ignoran los títulos y grados, estén donde estén en el nombre: `dr`, `dra`, `gral`, `general`, `cnel`, `coronel`, `pte`, `presidente`, `ing`, `ingeniero`, `mons`, `monseñor`, `pbro`, `fray`, `tte`, `teniente`, `sgto`, `sargento`, `cap`, `capitan`, `almte`, `almirante`, `brig`, `brigadier`, `prof`, `profesor`, `don`, `doña`. Vale para el texto escrito, para los nombres y alias del catálogo y para los nombres oficiales de Georef: `cecilia grierson` coincide por completo con «DRA CECILIA GRIERSON», y `gral paz` con «Av General Paz». Si el nombre no tiene más que títulos (una calle llamada «Coronel»), se conservan para que se pueda encontrar. A Georef se le envía el texto tal como se escribió, con sus títulos.
+- **Tolerancia a errores de tipeo según el largo de la palabra:** ninguna en palabras de menos de 4 letras, 1 error en las de 4 a 7 y 2 errores en las de 8 o más. Intercambiar dos letras vecinas cuenta como un solo error. Si las dos palabras tienen distinto largo, manda la más corta. Las palabras con dígitos no tienen tolerancia: `9 de julio` no es `8 de julio`.
+- **Iniciales.** Una letra suelta coincide con una palabra que empieza con esa letra (`f aguayo` con `Francisco Aguayo`, y al revés), pero sólo como ayuda: un texto hecho únicamente de letras sueltas no nombra ninguna calle.
+- **Pasajes con nombre decimal.** En `Pje 38,50` el decimal es el nombre de la calle, no una altura. La coma y el punto son equivalentes y los ceros finales no cuentan: `40,5` y `40,50` son el mismo pasaje. `pje 38.50 1200` se lee como pasaje 38,50 al 1200.
+- **Coincidencia completa, por el final del nombre o sólo parecida.** Hay tres formas de nombrar la calle, de mejor a peor:
+  1. *Exacta:* las mismas palabras, en el mismo orden.
+  2. *Completa:* todas las palabras escritas tienen su par (con errores de tipeo o iniciales, en cualquier orden) y al nombre del registro no le sobra nada más que iniciales.
+  3. *Por el final del nombre:* las palabras escritas coinciden, en el mismo orden, con las **últimas** palabras del nombre, que tiene otras antes. Es el caso de buscar por apellido: `grierson` nombra «DRA CECILIA GRIERSON»; `san martin` nombra «Zorrilla de San Martin» y «Gral José de San Martin»; `belgrano` nombra «Crucero Belgrano». Cada palabra admite la tolerancia a errores de siempre, pero no alcanza con el comienzo de una palabra.
+
+  Las tres cuentan como la calle escrita y reciben la categoría que corresponda («Misma cuadra», «Cuadra vecina», «Misma calle», «Dirección interpolada», «La calle existe»). Dentro de cada categoría se ordenan así: exactas, completas y por el final del nombre; a igual forma, vale el orden propio de la categoría. Una fila que coincide por el final del nombre lo indica con la nota «Coincide con el final del nombre» y nunca se selecciona sola.
+
+  En cambio, el resultado es «Parecido» si al registro le sobran palabras después o en medio de las escritas (`san` o `san martin` frente a «San Martin Norte»), o si la última palabra escrita es sólo el comienzo de otra, con 3 letras o más (`griers`, `san mart`). Si se escriben más palabras que las que tiene el nombre, no coincide.
+- **Intersecciones.** La calle que cruza se envía a Georef; contra el catálogo se compara sólo la calle principal.
+
+### Confirmación y discrepancia entre fuentes
+
+- Si un registro de «Misma cuadra» tiene una dirección de Georef a **300 m o menos**, pasa a «Cuadra confirmada». Cada dirección de Georef confirma un solo registro: el más cercano.
+- Si el registro queda sin confirmar y Georef ubica esa dirección en la ciudad de Santa Fe en otro punto, la fila lo advierte («Georef ubica esta dirección a N m de este punto») y la dirección de Georef se muestra aparte como «Dirección interpolada». El operador decide.
+- Las localidades cuyo rango de alturas no puede contener la altura escrita se descartan (por ejemplo, una calle que en Recreo llega al 1599 no se muestra para la altura 8540). Si Georef no informa los dos extremos del rango, no se descarta nada.
+
+### Cuándo aparecen las filas «Parecido»
+
+Sólo cuando las categorías 0 a 6 están vacías: alcanza una fila «La calle existe» para ocultarlas. Como Georef responde después que el catálogo, puede ocurrir que las filas «Parecido» se vean un momento y luego desaparezcan. La excepción es la fila que el operador ya eligió: esa queda visible aunque lleguen resultados mejores.
+
+### Teclado y selección automática
+
+- **Enter sin elegir** abre un resultado únicamente en dos casos: hay una sola «Referencia» clara (la regla de siempre) y ninguna fila de cuadra; o hay una sola fila «Cuadra confirmada» o «Misma cuadra», ninguna «Referencia», y esa fila no coincide sólo por el final del nombre. En cualquier otro caso no abre nada y pide elegir con ↑ ↓.
+- **Las filas que sólo aporta Georef nunca se seleccionan solas**, aunque sean las únicas. La misma calle y altura puede existir en varias localidades.
+- **La elección del operador no se mueve.** Elegir una fila (con ↑ ↓ o pasando el mouse) la fija: las respuestas de Georef que lleguen después pueden agregar filas arriba o abajo, pero la fila elegida sigue siendo la misma, también si la lista simple se convierte en categorizada. Si la fila elegida dejara de estar en pantalla, Enter no abre nada.
+- En una fila «La calle existe», Enter abre la búsqueda por texto en Google Maps (calle, altura escrita y localidad), porque no hay coordenadas.
+
+### Límites conocidos
+
+- **Georef tiene huecos.** Una calle que `/calles` lista puede no devolver nada en `/direcciones` (`rivadavia 1500` en la ciudad de Santa Fe). Que no haya dirección interpolada no significa que la calle no exista: por eso existe la categoría «La calle existe».
+- **Georef no conoce barrios ni lugares:** sólo calles y alturas.
+- **Sin garantía de disponibilidad.** Es un servicio público; el buscador funciona sin él, sólo con el catálogo.
+- **Pasajes «S/N».** Los registros `Pje S/N <cuadra>` no se encuentran por nombre de calle, porque su nombre son sólo letras sueltas.
+- **Títulos sueltos.** Como los títulos se ignoran, un título solo no encuentra las calles que lo llevan: `coronel` no coincide con «Coronel Dorrego» (sí `dorrego` o `coronel dorrego`).
+- **Ordinales.** `1ro de Mayo` necesita la grafía exacta; `1 de mayo` no coincide.
+- **Texto después de la altura.** En `san martin 2500 depto 3` se toma el `3` como altura y el resto como nombre de calle. Conviene escribir sólo calle y altura.
+- **Calle que sólo conoce Georef, escrita sin altura.** Hasta que Georef responde, la pantalla puede indicar «Sin coincidencias».
+- **Umbrales provisorios.** Las dos cuadras de «Cuadra vecina», los 300 m de confirmación, la tolerancia a errores y los topes de filas son valores iniciales, pendientes de validar con el operador. Están en `src/lib/categorize.ts` y `src/lib/address.ts`.
+
+### Diagnóstico
+
+La consola del navegador registra cada consulta: las líneas con prefijo `[georef]` indican qué se pidió a Georef, cuánto tardó y qué devolvió (o que la respuesta se descartó porque el texto cambió); las líneas `[rank]` indican, para cada texto, cuántas filas hay de cada categoría y qué fila se selecciona sola, o que no se trató como búsqueda de calle.
 
 ## Fuentes de datos (uno o varios Excel)
 
@@ -88,7 +175,7 @@ Tarda unos 12 segundos porque la hoja `Santa Rita 1` de Fonavis declara más de 
 ## Otros comandos
 
 ```bash
-npm test          # importador, coordenadas, Maps, compartir, búsqueda, Georef, teclado
+npm test          # importador, coordenadas, Maps, compartir, búsqueda, direcciones, categorización, Georef, teclado
 npm run typecheck # TypeScript
 npm run build     # build de producción en dist/
 npm run benchmark # compara motores de búsqueda sobre los datos reales
@@ -102,8 +189,9 @@ npm run benchmark # compara motores de búsqueda sobre los datos reales
 data-sources.json   Libros que alimentan el catálogo
 scripts/            Procesamiento del Excel (lectura, parser por secciones, validación, reportes)
 public/data/        Datos normalizados
-src/lib/            Lógica pura: búsqueda, normalización, URLs de Maps, catálogo, consulta a Georef
-src/components/     Componentes visuales
+src/lib/            Lógica pura: búsqueda, normalización, URLs de Maps, catálogo, consulta a Georef,
+                    lectura de direcciones (address.ts) y categorización de coincidencias (categorize.ts)
+src/components/     Componentes visuales (lista simple: ResultList; lista categorizada: RankedResults)
 reports/            Auditorías, decisiones técnicas, resumen y registros inválidos
 tests/              Tests, incluido el set de relevancia con registros reales (gold.ts)
 ```
@@ -111,5 +199,5 @@ tests/              Tests, incluido el set de relevancia con registros reales (g
 ## Más información
 
 - `reports/excel-audit.md`: resumen de las fuentes y hallazgos entre ellas; el detalle de cada libro está en `reports/audit-<fuente>.md`.
-- `reports/technical-decisions.md`: motor elegido, métricas medidas y reglas de ranking.
+- `reports/technical-decisions.md`: motor elegido, métricas medidas, reglas de ranking y categorización de coincidencias con Georef.
 - `reports/transformation-summary.md`: cantidades por fuente, hoja, tipo y motivo de descarte.

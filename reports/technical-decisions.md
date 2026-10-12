@@ -132,3 +132,145 @@ Se preselecciona un resultado únicamente si es el mejor de su nivel, de nivel e
 ## 8. Pendientes y riesgos
 
 Ver la sección *Riesgos* de `excel-audit.md`. En particular: significado de las marcas `c`/`ver`/`ç`, el bloque de `Santa Rita 1` que parece pertenecer a otro barrio, 28 elementos sin coordenadas utilizables y 2 coordenadas con la longitud truncada.
+
+## 9. Categorización de coincidencias y Georef (2026-10-11)
+
+Esta sección describe el comportamiento vigente para búsquedas de calles y direcciones y **reemplaza** tres afirmaciones anteriores de este documento: «no hay solicitudes HTTP por consulta» (§1 y tabla de §6) y «no hay geocodificación» (§7). Siguen siendo ciertas para el catálogo propio, que se busca en memoria; ya no lo son para la aplicación completa, que consulta Georef en cada búsqueda con forma de calle. Las medidas de latencia de §3 y §6 corresponden al motor local y no incluyen a Georef.
+
+### Problema observado en los datos reales
+
+- **Georef no llegaba a consultarse.** La versión anterior consultaba Georef sólo si el catálogo no devolvía ninguna coincidencia. En la práctica casi siempre hay alguna coincidencia débil, así que la consulta no se disparaba.
+- **Alturas tratadas como texto.** El motor aplicaba prefijos y tolerancia a errores también a los números: `san martin 2500` devolvía «Sobre San Martin 8500» como coincidencia.
+- **El catálogo es un nomenclador por cuadra.** 630 de los 1.062 registros son de tipo `calle` («Sobre San Martin 8500»). El responsable de los datos confirmó que cada uno marca la **cuadra entera** (8500 a 8599). Llevan el nombre popular y, como alias, el nombre de Google Maps, que a menudo difiere («Pje Segundo 4800» figura como «F Aguayo»).
+- **Georef no devuelve puntaje.** `/calles` busca con tolerancia y por prefijo y devuelve rangos de altura por localidad. `/direcciones` puede devolver cero resultados para una calle que `/calles` lista (`rivadavia 1500` en la ciudad de Santa Fe): una respuesta vacía no significa que la calle no exista. Esto se observó consultando la API real, no surge de su documentación.
+
+### Qué hacen los geocodificadores de producción
+
+Los servicios consultados no reducen la calidad de una coincidencia a un único número: califican por componente, informan el tipo de resultado y separan lo que se muestra de lo que se acepta sin intervención.
+
+| Servicio | Mecanismo | Qué aporta al diseño |
+| --- | --- | --- |
+| Mapbox | `match_code`: un valor por componente (`address_number`, `street`, `postcode`, `place`…) con `matched`, `unmatched`, `plausible` (altura interpolada), más una confianza global (`exact`, `high`, `medium`, `low`) | Calle y altura se califican por separado y se resumen en una categoría global. Una altura corregida baja la confianza a `low`. |
+| HERE | `queryScore` (cuánto del texto se reconoció) y `fieldScore` por campo (`streets`, `houseNumber`, `city`), de 0 a 1 | Un puntaje global bajo no implica un mal resultado: hay que mirar los campos que importan. No publica umbrales; indica decidir según el costo de un error. |
+| Google | `location_type` (`ROOFTOP`, `RANGE_INTERPOLATED`, `GEOMETRIC_CENTER`, `APPROXIMATE`) y `partial_match` | El tipo de resultado (punto exacto, interpolado, centro de la calle) es un eje propio, distinto del nombre. |
+| Pelias | `match_type` (`exact`, `interpolated`, `fallback`), `accuracy` (`point`, `centroid`) y `confidence` | Distingue lo encontrado de lo estimado y de lo devuelto «por si sirve». |
+| Esri (ArcGIS) | Puntaje de 0 a 100 con dos umbrales: puntaje mínimo de candidato (qué se muestra) y puntaje mínimo de coincidencia (qué se acepta sin revisar) | Mostrar y aceptar automáticamente son decisiones con umbrales distintos. |
+
+Correspondencia con este proyecto: grado del nombre de calle y comparación de altura por separado; ocho categorías como calificación global; la fuente como eje aparte; y dos reglas distintas, una para mostrar una fila y otra, más estricta, para seleccionarla sin intervención del operador.
+
+**Límites de esta investigación.** Que «los números se comparan de forma exacta» es una **inferencia**, no una regla documentada: se apoya en que Mapbox y Esri tratan la altura como un componente propio (Mapbox con `address_number` y con una confianza que no admite corregirla; Esri con un ajuste específico para alturas fuera de rango). No se encontró ninguna fuente primaria sobre interfaces de despacho o de radiooperación.
+
+### Decisiones
+
+Decisiones del responsable del proyecto:
+
+1. Calle y altura se califican por separado; hay una categoría global; la fuente es un eje aparte.
+2. La altura se compara **por cuadra** (centena), nunca con tolerancia ni por prefijo.
+3. El nombre de la calle se compara contra el nombre popular **y** contra el alias de Google Maps; se muestran ambos.
+4. Georef se consulta **siempre**; el categorizador ordena todo en una sola lista.
+5. La jerarquía y los umbrales son iniciales, «para iniciar y probar».
+6. Un pasaje con nombre decimal («Pje 38,50») se lee entero como nombre de calle; `40,5` y `40,50` son el mismo pasaje.
+7. Las filas «Parecido» se muestran sólo cuando no hay nada mejor (categorías 0 a 6 vacías).
+8. Los errores de tipeo del catálogo no se corrigen en la aplicación: los mantiene el responsable de los datos.
+9. Las líneas de diagnóstico en la consola (`[georef]`, `[rank]`) se conservan en producción por pedido expreso, pese a una sugerencia de revisión en contra.
+
+Jerarquía resultante (`src/lib/categorize.ts`):
+
+| # | Categoría | Fuente | Regla |
+| --- | --- | --- | --- |
+| 0 | Referencia | Catálogo | Coincidencia del motor con confianza: no parcial y de nivel «todas las palabras completas o prefijos» o mejor |
+| 1 | Cuadra confirmada | Catálogo + Georef | Categoría 2 con una dirección de Georef a 300 m o menos; la dirección se pliega en la fila |
+| 2 | Misma cuadra | Catálogo | Nombre de calle fuerte o exacto y misma cuadra que la altura |
+| 3 | Dirección interpolada | Georef | Resultado de `/direcciones` con nombre fuerte o exacto que no se plegó en una fila de categoría 1 |
+| 4 | Cuadra vecina | Catálogo | Nombre fuerte o exacto y distancia de 100 a 200 en numeración |
+| 5 | Misma calle | Catálogo | Nombre fuerte o exacto y: sin altura, a más de 200, o registro sin cuadra |
+| 6 | La calle existe | Georef | Resultado de `/calles` con nombre fuerte o exacto, en una localidad sin fila de categoría 3 y cuyo rango admite la altura |
+| 7 | Parecido | Ambas | Nombre de calle débil, o coincidencia del motor sin confianza |
+
+Elecciones de implementación (no son decisiones del responsable; se pueden cambiar sin consultarlo si no alteran lo anterior):
+
+- Grados del nombre: `exact`, `strong`, `weak`, `none` (`gradeStreetName` en `src/lib/address.ts`). La distancia de edición cuenta la transposición de letras vecinas como un error, y el presupuesto de errores lo fija la palabra más corta del par.
+- Una consulta hecha sólo de letras sueltas no nombra ninguna calle: una inicial sólo acompaña a una palabra completa. Surgió de la revisión: una letra suelta calificaba como coincidencia fuerte a toda calle con esa inicial.
+- Las localidades cuyo rango de alturas no admite la altura escrita se descartan. Surgió de una prueba en vivo: «SAN MARTIN @ Recreo [0-1599]» para la altura 8540 era ruido.
+- Un rango de Georef con un solo extremo conocido se trata como desconocido (no filtra). Con ambos extremos, mínimo y máximo se toman de los cuatro valores laterales, porque hay calles digitalizadas en sentido inverso.
+- La altura que informa Georef se acepta sólo si es un número o un texto de dígitos (`0x10` o `1e3` no son alturas).
+- Las confirmaciones se asignan de la más cercana a la más lejana: cada dirección confirma una sola fila.
+- La discrepancia sólo la marcan direcciones de la ciudad de Santa Fe, que además encabeza las filas de Georef.
+- Selección automática: una única «Referencia» inequívoca sin filas de cuadra, o una única fila de categoría 1 o 2 sin ninguna «Referencia». Nunca una fila de Georef.
+- La elección del operador se guarda por clave estable, común a la lista simple y a la categorizada, de modo que una respuesta tardía de Georef no la mueve.
+- Georef se consulta desde el navegador con 400 ms de espera tras la última tecla y 1,5 s de tiempo máximo por solicitud; `/calles` y `/direcciones` salen en paralelo y las filas del catálogo no esperan.
+- El motor de búsqueda (§4) dejó de aplicar tolerancia y transposiciones a las palabras con dígitos.
+
+### Umbrales provisorios
+
+Todos los valores de esta tabla son iniciales y están **pendientes de validación con el operador**.
+
+| Umbral | Valor | Dónde |
+| --- | --- | --- |
+| Cuadra vecina | hasta 200 de distancia en numeración (dos cuadras) | `NEIGHBOUR_BLOCK_DISTANCE` |
+| Acuerdo entre catálogo y Georef | 300 m | `AGREEMENT_METERS` |
+| Tolerancia a errores en nombres de calle | 0 en palabras de menos de 4 letras, 1 de 4 a 7, 2 desde 8; ninguna en palabras con dígitos | `tolerance` en `address.ts` |
+| Prefijo en la última palabra | 3 letras o más (da grado débil) | `MIN_PREFIX_LENGTH` |
+| Tope de «Misma calle» | 8 filas | `SAME_STREET_CAP` |
+| Tope de «La calle existe» | 5 filas | `STREET_EXISTS_CAP` |
+| Tope de «Parecido» | 5 filas (más la fila elegida por el operador) | `SIMILAR_CAP` |
+
+La tolerancia de nombres de calle (1 error de 4 a 7 letras, 2 desde 8) es distinta de la del motor de §4 (1 error hasta 6 letras, 2 desde 7). Son dos capas independientes.
+
+### Alternativas descartadas
+
+| Alternativa | Motivo del descarte |
+| --- | --- |
+| Consultar Georef sólo cuando el catálogo no tiene la cuadra | Se perderían la confirmación (categoría 1) y la advertencia de discrepancia, que existen justamente cuando el catálogo sí tiene la cuadra. El responsable decidió consultar siempre y dejar que el categorizador ordene. |
+| Comparar la altura de forma exacta | Los registros del catálogo marcan cuadras enteras, no puertas: `san martin 8540` no coincidiría con «Sobre San Martin 8500», que es precisamente la cuadra buscada. |
+| Mostrar siempre las filas «Parecido» | Las coincidencias sin confianza del motor llenaban la lista con registros ajenos («San Jose 8500» para `san martin 8540`). El responsable decidió mostrarlas sólo cuando no hay nada mejor. |
+
+### Evidencia medida
+
+| Dato | Valor |
+| --- | --- |
+| `npm test` | 645 de 645 (12 archivos), ejecutado el 2026-10-11 |
+| Set de relevancia (`tests/gold.ts`) | 38/38, sin cambios |
+| Tests de `address.ts` / `georef.ts` al cerrar sus tareas | 137 / 78 |
+| Registros de tipo `calle` | 630 de 1.062; los 630 se interpretan |
+| Registros con cuadra | 628 de 630 (sin cuadra: «Falcon» y «Pje 173,70») |
+| Registros con nombre decimal | 34 |
+| Registros con cuadra doble («8300 / 8400») | 12 |
+| Alias con dos nombres separados por barra | 2 |
+| Registros «Pje S/N» que ya no coinciden por nombre | 6 |
+
+Pruebas en vivo, con el catálogo real y la API real de Georef:
+
+| Consulta | Resultado |
+| --- | --- |
+| `san martin 8540` | «Cuadra confirmada»: «Sobre San Martin 8500», con Georef a 12 m; se selecciona sola |
+| `san martin 2500` | Primero «Dirección interpolada» en Santa Fe y Santo Tomé; las cuadras 8500 a 8900 del catálogo quedan como «Misma calle» |
+| `pje 32.50 8350` | «Misma cuadra»: «Pje 32,50 8300 / 8400» |
+| `comisaria 25` | Una sola fila «Referencia», seleccionada sola |
+| `/calles` con `rivadavia` | 6 localidades con rango (Santa Fe 0 a 9699); `/direcciones` con `rivadavia 1500` no devuelve ningún resultado en Santa Fe |
+| `/calles` con `san matrin` | Devuelve SAN MARTIN (búsqueda tolerante); un texto sin sentido devuelve 0 |
+
+**Lo que no se midió.** La lista categorizada no se verificó en un navegador real: los tests de interfaz corren en jsdom. No se midió la latencia de Georef de forma sistemática ni su disponibilidad.
+
+### Pendientes
+
+- Validar los umbrales y los topes con el operador.
+- Consultar Georef con el alias de Google Maps cuando difiere del nombre popular.
+- Pasajes «S/N»: tratar `s/n` como una sola palabra para que vuelvan a coincidir por nombre.
+- Ordinales (`1ro de Mayo` frente a `1 de mayo`) y texto después de la altura (`depto 3`, que hoy se lee como altura).
+- Los 21 registros con alias de una sola letra (`c`) ya no coinciden con la consulta `c`.
+- Fuera de la lista categorizada no se indica «Buscando en Georef…»: una calle que sólo conoce Georef, escrita sin altura, muestra «Sin coincidencias» hasta que llega la respuesta.
+- Pasar el mouse sobre una fila la fija como elegida; una fila «Parecido» fijada se suma al tope (la lista puede tener 6).
+- `comisaria 25` muestra dos etiquetas «Referencia» (tipo de registro y categoría).
+- «Av Peñaloza 7700» perdió la selección automática porque «MONOBLOCK 11» también es una coincidencia con confianza del motor (ambiguo: no se selecciona).
+- El enlace de respaldo a Google Maps queda fuera de la región `role="status"`.
+- Verificación en un navegador real.
+
+### Fuentes
+
+- Pelias, calidad de resultados: https://github.com/pelias/documentation/blob/master/result_quality.md
+- Google, Geocoding API: https://developers.google.com/maps/documentation/geocoding/requests-geocoding
+- Mapbox, Geocoding API: https://docs.mapbox.com/api/search/geocoding/
+- HERE, puntajes de geocodificación: https://docs.here.com/geocoding-and-search/docs/code-geocode-scoring
+- Esri, calidad de geocodificación en ArcGIS Pro: https://doc.esri.com/en/arcgis-pro/latest/help/data/geocoding/tips-for-improving-geocoding-quality.html
+- Georef, API del Servicio de Normalización de Datos Geográficos de Argentina: https://datosgobar.github.io/georef-ar-api/

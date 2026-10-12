@@ -192,6 +192,37 @@ body {
   border-color: var(--border);
 }
 
+/* Approximate (Georef) addresses: a dashed, accent-tinted look keeps them apart from verified references. */
+.badge.georef-badge {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-style: dashed;
+  border-color: var(--accent);
+  text-transform: none;
+}
+
+.georef-localidad {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.georef-empty {
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.georef-empty p {
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+
+.georef-empty .maps-link {
+  display: inline-block;
+  white-space: normal;
+}
+
 @media (max-width: 640px) {
   .maps-link {
     padding: 12px;

@@ -85,7 +85,9 @@ function fieldText(ref: Reference, field: Field): string {
   }
 }
 
-const withoutStopwords = (text: string) => splitTokens(text).filter((t) => !isStopword(t));
+const HAS_DIGIT = /\d/;
+
+const withoutStopwords =(text: string) => splitTokens(text).filter((t) => !isStopword(t));
 
 /** Adjacent-letter swaps ("rtia" -> "rita"); edit distance counts a swap as two edits. */
 function swaps(term: string): string[] {
@@ -144,12 +146,14 @@ export class SearchEngine {
 
     const options = {
       prefix: true,
-      fuzzy: (term: string) => (term.length < 4 ? false : term.length <= 6 ? 1 : 2),
+      // A number is never typo-tolerant: "2500" must not reach the block "8500".
+      fuzzy: (term: string) => (term.length < 4 || HAS_DIGIT.test(term) ? false : term.length <= 6 ? 1 : 2),
       boost: { nombre: 5, aliases: 3, direccion: 3, barrio: 2, tipoTexto: 1 },
       weights: { fuzzy: 0.3, prefix: 0.6 },
     };
     const perToken: Query[] = tokens.map((t) => {
-      const variants = t.length >= 4 ? swaps(t).filter((v) => this.vocabulary.has(v)) : [];
+      const variants =
+        t.length >= 4 && !HAS_DIGIT.test(t) ? swaps(t).filter((v) => this.vocabulary.has(v)) : [];
       return variants.length ? { combineWith: 'OR', queries: [t, ...variants] } : t;
     });
 
